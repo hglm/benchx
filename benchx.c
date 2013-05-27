@@ -373,7 +373,7 @@ static void test_iteration(int test, int i, int w, int h) {
                     i & 7, ((i / 8) & 7));
                 break;
             case TEST_PIXMAPFILLRECT :
-                XFillRectangle(display, pixmap1,
+                XFillRectangle(display, pixmap2,
                     pixmap2_gc, i & 7, ((i / 8) & 7), w, h);
                 break;
             }
