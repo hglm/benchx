@@ -29,9 +29,10 @@ lines:
 	xset s off
 	benchx <testname> > benchx.out
 
-The first line disables the X screensaver. If you then start the X server using startx, it will
-automatically run the specified test, and the X server should exit after it is finished. A sample
-xinitrc file that runs all the tests is provided.
+The first line disables the X screensaver. You may need other measures to disable screen blanking
+after a certain period. If you start the X server using startx, it will automatically run the
+specified test, and the X server should exit after it is finished. A sample xinitrc file that
+runs all the tests is provided.
 
 The output includes the number of operations per second, the pixel bandwidth in
 MB/s, and if available the user and system CPU usage of the X server. The X server
@@ -40,6 +41,8 @@ be low, except for FillRect at small sizes (Xlib overhead for lots of small requ
 PutImage at large sizes (moving large amounts of data through the X socket).
 
 Running as root is helpful but not strictly necessary.
+
+A tool to compare output results is provided (benchxcomp).
 
 Note about PutImage performance:
 
