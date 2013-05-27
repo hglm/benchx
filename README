@@ -3,10 +3,27 @@ benchx
 This is small benchmark program to test the throughput of low-level drawing primitives in the X
 server. It supports 16bpp and 32bpp.
 
-Usage:
-	benchx <testname>
+*** Installation ***
 
-where <testname> is one of the following:
+Try "sudo make install". You may need to install various X development libraries to succesfully
+compile.
+
+*** Usage ***
+
+Usage:
+	benchx <options> <testname>
+
+Options:
+
+	--duration <seconds>
+
+            The duration of each subtest in seconds. Default is 5.
+
+	--window
+
+            Run in a window.
+
+<testname> is one of the following:
 
 	ScreenCopy			Screen to screen blits (using XCopyArea).
 	AlignedScreenCopy		Aligned screen to screen blits (e.g. vertical scrolling).
@@ -22,17 +39,29 @@ where <testname> is one of the following:
 
 Run benchx without arguments for the full list.
 
-It is best run on a bare X server without a window manager, because otherwise the root window may be
-obscured. To do so, create or edit the file .xinitrc in your home directory so that has the two
-lines:
+Running as root is helpful for accuracy but not strictly necessary.
+
+*** Running on a bare X server ***
+
+It is best run on a bare X server without a window manager, because otherwise the window manager
+may interfere with the results. To do so, create or edit the file .xinitrc in your home directory
+so that has the two lines:
 
 	xset s off
 	benchx <testname> > benchx.out
 
-The first line disables the X screensaver. You may need other measures to disable screen blanking
+The first line disables the X screensaver. You may need other measures to disable screen saving/blanking
 after a certain period. If you start the X server using startx, it will automatically run the
 specified test, and the X server should exit after it is finished. A sample xinitrc file that
 runs all the tests is provided.
+
+*** Running in a window ***
+
+With the --window option, the benchmark will run in a window. This is useful for running the program
+with an X server that is already running from within the GUI environment. Results may be less accurate
+that when running with a bare X server.
+
+*** Interpreting results ***
 
 The output includes the number of operations per second, the pixel bandwidth in
 MB/s, and if available the user and system CPU usage of the X server. The X server
@@ -40,9 +69,11 @@ process name looked for is "Xorg". The CPU usage of benchx itself is not reporte
 be low, except for FillRect at small sizes (Xlib overhead for lots of small requests), and basic
 PutImage at large sizes (moving large amounts of data through the X socket).
 
-Running as root is helpful but not strictly necessary.
+A tool to compare output results is provided (benchxcomp), which takes to output files as arguments
+and shows signficant speed-ups, slow-downs and differences in X server CPU usage between the two
+tests.
 
-A tool to compare output results is provided (benchxcomp).
+*** Notes ***
 
 Note about PutImage performance:
 

@@ -45,11 +45,11 @@
 /*
  * The size of the area on the root window into which will be drawn.
  */
-#define WINDOW_WIDTH 600
-#define WINDOW_HEIGHT 600
+#define AREA_WIDTH 600
+#define AREA_HEIGHT 600
 
-/* The running time in seconds for each subtest. */
-#define RUNNING_TIME_IN_SECONDS 5
+/* The default running time in seconds for each subtest. */
+#define DEFAULT_TEST_DURATION 5
 
 #define _POSIX_SOURCE
 #define _XOPEN_SOURCE 600
@@ -91,6 +91,8 @@ static Visual  *visual = NULL;
 static unsigned int depth;
 static unsigned int bpp;
 static int screen_width, screen_height;
+static Window window;
+static GC window_gc = None;
 
 static int feature_composite = False;
 static int feature_render = False;
@@ -98,7 +100,6 @@ static int feature_shm_pixmap = False;
 static int feature_shm = False;
 
 static XGCValues gcvalues;
-static GC root_gc = None;
 static GC pixmap2_gc = None;
 
 static XImage *ximage = NULL;
@@ -118,6 +119,8 @@ static Picture shmpixmap_pict;
 static Picture window_pict;
 
 static int X_pid;
+static int test_duration = DEFAULT_TEST_DURATION;
+static int window_mode = 0;
 
 /*
  * Get pid of process by name.
@@ -294,7 +297,7 @@ static void draw_text(int x, int y, const char *s) {
     /* Set foreground color to white. */
     XGCValues values;
     values.foreground = 0x00FFFFFF;
-    XChangeGC(display, root_gc, GCForeground, &values);
+    XChangeGC(display, window_gc, GCForeground, &values);
     /* Draw the text. */
     int len = strlen(s);
     for (int i = 0; i < len; i++) {
@@ -305,7 +308,7 @@ static void draw_text(int x, int y, const char *s) {
         for (int cy = 0; cy < 8; cy++)
             for (int cx = 0; cx < 8; cx++)
                 if (fontdata_8x8[(int)s[i] * 8 + cy] & (0x80 >> cx))
-                    XDrawPoint(display, root_window, root_gc, x + i * 8 + cx, y + cy);
+                    XDrawPoint(display, window, window_gc, x + i * 8 + cx, y + cy);
     }
 }
 
@@ -313,19 +316,19 @@ static void print_text_graphical(const char *s) {
     int max_lines = screen_height / 10;
     if (nu_lines == max_lines) {
         /* Scroll. */
-        XCopyArea(display, root_window, root_window, root_gc,
-            WINDOW_WIDTH + 16, 10,
-            screen_width - (WINDOW_WIDTH + 16), (max_lines - 1) * 10,
-            WINDOW_WIDTH + 16, 0);
+        XCopyArea(display, window, window, window_gc,
+            AREA_WIDTH + 16, 10,
+            screen_width - (AREA_WIDTH + 16), (max_lines - 1) * 10,
+            AREA_WIDTH + 16, 0);
         XGCValues values;
         values.foreground = 0;
-        XChangeGC(display, root_gc, GCForeground, &values);
-        XFillRectangle(display, root_window, root_gc,
-            WINDOW_WIDTH + 16, (max_lines - 1) * 10,
-            screen_width - (WINDOW_WIDTH + 16), 10);
+        XChangeGC(display, window_gc, GCForeground, &values);
+        XFillRectangle(display, window, window_gc,
+            AREA_WIDTH + 16, (max_lines - 1) * 10,
+            screen_width - (AREA_WIDTH + 16), 10);
         nu_lines--;
    }
-   draw_text(WINDOW_WIDTH + 16, nu_lines * 10, s);
+   draw_text(AREA_WIDTH + 16, nu_lines * 10, s);
    nu_lines++;
 }
 
@@ -351,28 +354,28 @@ static void test_iteration(int test, int i, int w, int h) {
             switch (test) {
             case TEST_SCREENCOPY :
                 XCopyArea(display,
-                    root_window, root_window,
-                    root_gc,
+                    window, window,
+                    window_gc,
                     i & 7, 1,
                     w, h,
                     (i / 8) & 7, 0);
                 break;
             case TEST_ALIGNEDSCREENCOPY :
                 XCopyArea(display,
-                    root_window, root_window,
-                    root_gc,
+                    window, window,
+                    window_gc,
                     i & 7, 1,
                     w, h,
                     i & 7, 0);
                 break;
             case TEST_FILLRECT :
-                XFillRectangle(display, root_window,
-                    root_gc, i & 7, ((i / 8) & 7), w, h);
+                XFillRectangle(display, window,
+                    window_gc, i & 7, ((i / 8) & 7), w, h);
                 break;
             case TEST_PUTIMAGE :
                 XPutImage(display,
-                    root_window,
-                    root_gc,
+                    window,
+                    window_gc,
                     ximage,
                     0, 0,
                     (i & 7), ((i / 8) & 7),
@@ -380,8 +383,8 @@ static void test_iteration(int test, int i, int w, int h) {
                 break;
             case TEST_SHMPUTIMAGE :
                 XShmPutImage(display,
-                    root_window,
-                    root_gc,
+                    window,
+                    window_gc,
                     shmximage_ximage,
                     0, 0,
                     (i & 7), ((i / 8) & 7),
@@ -389,8 +392,8 @@ static void test_iteration(int test, int i, int w, int h) {
                 break;
             case TEST_ALIGNEDSHMPUTIMAGE :
                 XShmPutImage(display,
-                    root_window,
-                    root_gc,
+                    window,
+                    window_gc,
                     shmximage_ximage,
                     0, 0,
                     (i & 1) * 8, ((i / 8) & 7),
@@ -398,16 +401,16 @@ static void test_iteration(int test, int i, int w, int h) {
                 break;
             case TEST_SHMPIXMAPTOSCREENCOPY :
                 XCopyArea(display,
-                    shmpixmap, root_window,
-                    root_gc,
+                    shmpixmap, window,
+                    window_gc,
                     0, 0,
                     w, h,
                     i & 7, ((i / 8) & 7));
                 break;
             case TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY :
                 XCopyArea(display,
-                    shmpixmap, root_window,
-                    root_gc,
+                    shmpixmap, window,
+                    window_gc,
                     0, 0,
                     w, h,
                     (i & 1) * 8, ((i / 8) & 7));
@@ -434,8 +437,7 @@ void do_test(int test, int subtest, int w, int h) {
     /*
      * Set the number iterations to queue before calling
      * XFlush and checking the duration.
-     * This does not define the running time; RUNNING_TIME_IN_SECONDS
-     * does.
+     * This does not define the running time; test_duration does.
      */
     switch (test) {
     case TEST_SCREENCOPY :
@@ -478,22 +480,22 @@ void do_test(int test, int subtest, int w, int h) {
     }
 
     unsigned int c = rand();
-    for (int i = 0; i < WINDOW_WIDTH * WINDOW_HEIGHT * (bpp / 8); i++) {
+    for (int i = 0; i < AREA_WIDTH * AREA_HEIGHT * (bpp / 8); i++) {
             *((unsigned char *)data + i) = c & 0xFF;
             c += 0x7E7E7E7E;
             if ((i & 255) == 255)
                 c = rand();
     }
     XPutImage(display,
-                root_window, 
-		root_gc,
+                window, 
+		window_gc,
 		ximage, 
 		0, 0, 
 		0, 0, 
-		WINDOW_WIDTH, WINDOW_HEIGHT);
+		AREA_WIDTH, AREA_HEIGHT);
     if (test == TEST_SHMPUTIMAGE || test == TEST_ALIGNEDSHMPUTIMAGE) {
         unsigned int c = rand();
-        for (int i = 0; i < WINDOW_WIDTH * WINDOW_HEIGHT * (bpp / 8); i++) {
+        for (int i = 0; i < AREA_WIDTH * AREA_HEIGHT * (bpp / 8); i++) {
             *((unsigned char *)shmdata_ximage + i) = c & 0xFF;
             c += 0x7E7E7E7E;
             if ((i & 255) == 255)
@@ -503,7 +505,7 @@ void do_test(int test, int subtest, int w, int h) {
     if (test == TEST_SHMPIXMAPTOSCREENCOPY || test == TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY
     || test == TEST_PIXMAPCOPY) {
         unsigned int c = rand();
-        for (int i = 0; i < WINDOW_WIDTH * WINDOW_HEIGHT * (bpp / 8); i++) {
+        for (int i = 0; i < AREA_WIDTH * AREA_HEIGHT * (bpp / 8); i++) {
             *((unsigned char *)shmdata_pixmap + i) = rand() & 0xFF;
             c += 0x7E7E7E7E;
             if ((i & 255) == 255)
@@ -513,13 +515,13 @@ void do_test(int test, int subtest, int w, int h) {
     XGCValues values;
     /* Draw a dot to indicate which test is being run. */
     values.foreground = 0xFFFFFFFF;
-    XChangeGC(display, root_gc, GCForeground, &values);
-    XFillRectangle(display, root_window,
-                   root_gc, test * 16 + 8, WINDOW_HEIGHT + 8, 8, 8);
+    XChangeGC(display, window_gc, GCForeground, &values);
+    XFillRectangle(display, window,
+                   window_gc, test * 16 + 8, AREA_HEIGHT + 8, 8, 8);
     /* For FillRect, set a random fill color. */
     if (test == TEST_FILLRECT) {
         values.foreground = rand();
-        XChangeGC(display, root_gc, GCForeground, &values);
+        XChangeGC(display, window_gc, GCForeground, &values);
     }
     if (test == TEST_PIXMAPFILLRECT) {
         values.foreground = rand();
@@ -556,7 +558,7 @@ void do_test(int test, int subtest, int w, int h) {
         }
         XFlush(display);
         clock_gettime(CLOCK_REALTIME, &current);
-        if (current.tv_sec >= begin.tv_sec + RUNNING_TIME_IN_SECONDS)
+        if (current.tv_sec >= begin.tv_sec + test_duration)
             break;
     }
     /* Make sure no pending request is remaining. */
@@ -621,20 +623,51 @@ main(int argc, char *argv[])
   int major;
   int minor;
 
-  unsigned int width = WINDOW_WIDTH;
-  unsigned int height = WINDOW_HEIGHT;
+  unsigned int width = AREA_WIDTH;
+  unsigned int height = AREA_HEIGHT;
 
   int prio;
   int sched;
   struct sched_param param;
   pid_t pid;
 
+    int argi = 1;
     if (argc == 1) {
-        printf("Usage: benchx <testname>\nTests:\n");
+        printf("Usage: benchx <options> <testname>\nOptions:\n"
+            "    --duration <seconds>\n"
+            "        Specifies the duration of each subtest in seconds. Default %d.\n"
+            "    --window\n"
+            "        Draw on a window instead of on the root window.\n"
+            "Tests:\n", DEFAULT_TEST_DURATION);
         for (int i = 0; i < NU_TEST_TYPES; i++)
             printf("    %s\n", test_name[i]);
         return 0;
     }
+    for (;;) {
+        if (argi >= argc) {
+            printf("No test name specified.\n");
+            return 1;
+        }
+        if (strcasecmp(argv[argi], "--duration") == 0 && argi + 1 < argc) {
+            test_duration = atoi(argv[argi + 1]);
+            if (test_duration < 1 || test_duration >= 100) {
+                printf("Invalid test duration of %d seconds.\n");
+                return 1;
+            }
+            argi += 2;
+            continue;
+        }
+        if (strcasecmp(argv[argi], "--window") == 0) {
+            window_mode = 1;
+            argi++;
+            continue;
+        }
+        break;
+    }
+    if (!window_mode)
+        fprintf(stderr, "If you don't see any graphical output, the root window may be obscured.\n"
+            "Results will not be meaningful. Consider using the --window option or run on a bare\n"
+            "X server.\n");
 
   pid = getpid();
 
@@ -847,9 +880,42 @@ main(int argc, char *argv[])
     return 1;
   }
 
+    /* Create a window if necessary. */
+    if (!window_mode)
+        window = root_window;
+    else {
+         XSetWindowAttributes winattr;
+  /* create the window */
+  winattr.background_pixel = XBlackPixel(display, screen);
+  winattr.border_pixel = XBlackPixel(display, screen);
+  winattr.colormap = colormap;
+  winattr.event_mask = 
+    ExposureMask |
+    VisibilityChangeMask |
+    StructureNotifyMask |
+    ResizeRedirectMask;
+  winattr.override_redirect = True;
+
+  window = 
+    XCreateWindow(display,
+		  root_window,
+		  0, 0,
+		  screen_width - 64, screen_height - 64,
+		  0,              /* border_width */
+		  depth,          /* depth */
+		  InputOutput,    /* class */
+		  visual,         /* visual */
+		  (CWBackPixel | 
+		   CWBorderPixel | 
+		   CWEventMask | 
+		   CWColormap |
+		   CWOverrideRedirect), /* valuemask */
+		  &winattr);
+    }
+
   /* create/get the colormap associated to the visual */
   colormap = XCreateColormap(display,
-			     root_window,
+			     window,
 			     visual,
 			     AllocNone);
 
@@ -984,7 +1050,7 @@ main(int argc, char *argv[])
   gcvalues.plane_mask = XAllPlanes();
   gcvalues.clip_mask = None;
   gcvalues.graphics_exposures = False; /* No NoExpose */
-  root_gc = XCreateGC(display, root_window,
+  window_gc = XCreateGC(display, window,
                  (GCBackground |
                   GCForeground |
                   GCFunction |
@@ -995,12 +1061,12 @@ main(int argc, char *argv[])
 
   /* create pixmaps */
   pixmap1 = XCreatePixmap(display,
-			 root_window, 
+			 window, 
 			 width,
 			 height,
 			 depth);
   pixmap2 = XCreatePixmap(display,
-			 root_window, 
+			 window, 
 			 width,
 			 height,
 			 depth);
@@ -1020,7 +1086,7 @@ main(int argc, char *argv[])
 
   if (feature_shm_pixmap) {
     shmpixmap = XShmCreatePixmap(display,
-				 root_window,
+				 window,
 				 shminfo_pixmap.shmaddr,
 				 &shminfo_pixmap,
 				 width,
@@ -1039,7 +1105,7 @@ main(int argc, char *argv[])
 				       &pict_attr);
     
     window_pict = XRenderCreatePicture(display, 
-				       root_window,
+				       window,
 				       pict_format,
 				       CPComponentAlpha,
 				       &pict_attr);
@@ -1053,21 +1119,43 @@ main(int argc, char *argv[])
     }
   }
 
+    if (window_mode) {
+      /* map the window and wait for it */
+      XMapWindow(display, window);
+
+      /* wait for map */
+      for(;;) {
+        XEvent e;
+
+        /* check X event */
+        XNextEvent(display, &e);
+    
+        printf("event %d\n", e.type);
+
+        if (e.type == MapNotify) {
+           break;
+        }
+      }
+    }
+
   /*
    * get high priority
    *
    */
+  int root_notice = 0;
   errno = 0;
   prio = getpriority(PRIO_PROCESS, pid);
   if (errno != 0) {
-    fprintf(stderr, "Can't get priority, harmless: %s\n", strerror(errno));
+//    fprintf(stderr, "Can't get priority, harmless: %s\n", strerror(errno));
+    root_notice = 1;
     prio = 0;
   }
   
   prio -= 20;
  
   if (setpriority(PRIO_PROCESS, pid, prio) == -1) {
-    fprintf(stderr, "Can't set priority, harmless: %s\n", strerror(errno));
+//    fprintf(stderr, "Can't set priority, harmless: %s\n", strerror(errno));
+      root_notice = 1;
   }
 
   /*
@@ -1081,33 +1169,40 @@ main(int argc, char *argv[])
   memset(&param, 0, sizeof(struct sched_param));
   sched = sched_getscheduler(pid);
   if (sched == -1) {
-    fprintf(stderr, "Can't get scheduler, harmless: %s\n", strerror(errno));
+//    fprintf(stderr, "Can't get scheduler, harmless: %s\n", strerror(errno));
+    root_notice = 1;
   }
 
   if (sched != SCHED_RR) {
     param.sched_priority = sched_get_priority_max(SCHED_RR);
     if (sched_setscheduler(pid, SCHED_RR, &param) == -1) {
-      fprintf(stderr, "Can't set scheduler, harmless: %s\n", strerror(errno));
+//      fprintf(stderr, "Can't set scheduler, harmless: %s\n", strerror(errno));
+      root_notice = 1;
     }
   } else {
     if (sched_getparam(pid, &param) == -1 || 
 	param.sched_priority != sched_get_priority_max(SCHED_RR)) {
       param.sched_priority = sched_get_priority_max(SCHED_RR);
       if (sched_setparam(pid, &param) == -1) {
-	fprintf(stderr, "Can't set scheduler parameters, harmless: %s\n",
-		strerror(errno));
+//	fprintf(stderr, "Can't set scheduler parameters, harmless: %s\n",
+//		strerror(errno));
+        root_notice = 1;
       }
     }
   }
 
   if (mlockall(MCL_CURRENT | MCL_FUTURE) == -1) {
-    fprintf(stderr, "Can't lock memory, harmless: %s\n",
-	    strerror(errno));
+//    fprintf(stderr, "Can't lock memory, harmless: %s\n",
+//	    strerror(errno));
+      root_notice = 1;
+  }
+  if (root_notice) {
+     fprintf(stderr, "Couldn't increase scheduler priority or lock memory, consider running as root.\n");
   }
 
     int test = - 1;
     for (int i = 0; i < NU_TEST_TYPES; i++)
-        if (strcasecmp(argv[1], test_name[i]) == 0) {
+        if (strcasecmp(argv[argi], test_name[i]) == 0) {
             test = i;
             break;
         }
@@ -1133,18 +1228,18 @@ main(int argc, char *argv[])
         values.foreground = 0x000000FF;
     else
         values.foreground = 0x0000001F;
-    XChangeGC(display, root_gc, GCForeground, &values);
+    XChangeGC(display, window_gc, GCForeground, &values);
     for (int i = 0; i < NU_TEST_TYPES - 1; i++) {
-        XFillRectangle(display, root_window,
-                       root_gc, i * 16 + 8, WINDOW_HEIGHT + 8, 8, 8);
+        XFillRectangle(display, window,
+                       window_gc, i * 16 + 8, AREA_HEIGHT + 8, 8, 8);
     }
 
-    int max_size = WINDOW_WIDTH;
-    if (max_size > WINDOW_HEIGHT)
-        max_size = WINDOW_HEIGHT;
+    int max_size = AREA_WIDTH;
+    if (max_size > AREA_HEIGHT)
+        max_size = AREA_HEIGHT;
 
     char s[80];
-    sprintf(s, "Screen size %d x %d, depth %d (%d bpp), window size %d x %d", screen_width,
+    sprintf(s, "Screen size %d x %d, depth %d (%d bpp), area size %d x %d", screen_width,
         screen_height, depth, bpp, max_size, max_size);
     printf("%s\n", s);
     print_text_graphical(s);
@@ -1165,9 +1260,9 @@ main(int argc, char *argv[])
                     values.foreground = 0x00007F00;
                 else
                     values.foreground = 0x000003E0;
-                XChangeGC(display, root_gc, GCForeground, &values);
-                XFillRectangle(display, root_window,
-                   root_gc, i * 16 + 8, WINDOW_HEIGHT + 8, 8, 8);
+                XChangeGC(display, window_gc, GCForeground, &values);
+                XFillRectangle(display, window,
+                   window_gc, i * 16 + 8, AREA_HEIGHT + 8, 8, 8);
             }
         }
     }
