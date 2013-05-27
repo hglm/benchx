@@ -441,7 +441,7 @@ void do_test(int test, int w, int h) {
     for (int i = 0; i < WINDOW_WIDTH * WINDOW_HEIGHT * (bpp / 8); i++) {
             *((unsigned char *)data + i) = c & 0xFF;
             c += 0x7E7E7E7E;
-            if (i & 255 == 255)
+            if ((i & 255) == 255)
                 c = rand();
     }
     XPutImage(display,
@@ -456,7 +456,7 @@ void do_test(int test, int w, int h) {
         for (int i = 0; i < WINDOW_WIDTH * WINDOW_HEIGHT * (bpp / 8); i++) {
             *((unsigned char *)shmdata_ximage + i) = c & 0xFF;
             c += 0x7E7E7E7E;
-            if (i & 255 == 255)
+            if ((i & 255) == 255)
                 c = rand();
         }
     }
@@ -466,7 +466,7 @@ void do_test(int test, int w, int h) {
         for (int i = 0; i < WINDOW_WIDTH * WINDOW_HEIGHT * (bpp / 8); i++) {
             *((unsigned char *)shmdata_pixmap + i) = rand() & 0xFF;
             c += 0x7E7E7E7E;
-            if (i & 255 == 255)
+            if ((i & 255) == 255)
                 c = rand();
         }
     }
