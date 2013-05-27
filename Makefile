@@ -6,7 +6,7 @@ benchx : benchx.c font_8x8.c font.h
 benchxcomp : benchxcomp.c
 	gcc -O2 -std=gnu99 benchxcomp.c -o benchxcomp
 
-install : benchxcomp
+install : benchx benchxcomp
 	install -m 0755 benchx /usr/bin/benchx
 	install -m 0755 benchxcomp /usr/bin/benchxcomp
 
