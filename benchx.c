@@ -83,11 +83,14 @@
 #include <sys/resource.h>
 #include <sched.h>
 
+#include "font.h"
+
 static Display *display = NULL;
 static Window root_window = None;
 static Visual  *visual = NULL;
 static unsigned int depth;
 static unsigned int bpp;
+static int screen_width, screen_height;
 
 static int feature_composite = False;
 static int feature_render = False;
@@ -281,6 +284,51 @@ flush_xevent(Display *d)
   }
 }
 
+/*
+ * Text drawing module.
+ */
+
+static int nu_lines = 0;
+
+static void draw_text(int x, int y, const char *s) {
+    /* Set foreground color to white. */
+    XGCValues values;
+    values.foreground = 0x00FFFFFF;
+    XChangeGC(display, root_gc, GCForeground, &values);
+    /* Draw the text. */
+    int len = strlen(s);
+    for (int i = 0; i < len; i++) {
+        if (s[i] == '\n')
+            break;
+        if (x + i * 8 + 8 > screen_width)
+            break;
+        for (int cy = 0; cy < 8; cy++)
+            for (int cx = 0; cx < 8; cx++)
+                if (fontdata_8x8[(int)s[i] * 8 + cy] & (0x80 >> cx))
+                    XDrawPoint(display, root_window, root_gc, x + i * 8 + cx, y + cy);
+    }
+}
+
+static void print_text_graphical(const char *s) {
+    int max_lines = screen_height / 10;
+    if (nu_lines == max_lines) {
+        /* Scroll. */
+        XCopyArea(display, root_window, root_window, root_gc,
+            WINDOW_WIDTH + 16, 10,
+            screen_width - (WINDOW_WIDTH + 16), (max_lines - 1) * 10,
+            WINDOW_WIDTH + 16, 0);
+        XGCValues values;
+        values.foreground = 0;
+        XChangeGC(display, root_gc, GCForeground, &values);
+        XFillRectangle(display, root_window, root_gc,
+            WINDOW_WIDTH + 16, (max_lines - 1) * 10,
+            screen_width - (WINDOW_WIDTH + 16), 10);
+        nu_lines--;
+   }
+   draw_text(WINDOW_WIDTH + 16, nu_lines * 10, s);
+   nu_lines++;
+}
+
 #define NU_TEST_TYPES 11
 #define TEST_SCREENCOPY 0
 #define TEST_ALIGNEDSCREENCOPY 1
@@ -379,7 +427,7 @@ static void test_iteration(int test, int i, int w, int h) {
             }
 }
 
-void do_test(int test, int w, int h) {
+void do_test(int test, int subtest, int w, int h) {
     int nu_iterations = 1000;
     int operation_count;
     int area = w * h;
@@ -517,20 +565,23 @@ void do_test(int test, int w, int h) {
     double begin_t = (double)begin.tv_sec + (double)begin.tv_nsec / 1000000000.0;
     double end_t = (double)end.tv_sec + (double)end.tv_nsec / 1000000000.0;
     double dt = end_t - begin_t;
+    char s[256];
     if (!no_usage) {
         double ucpu_usage, scpu_usage;
         /* Get CPU usage statistics for the X server. */
         get_usage(X_pid, &usage_after);
         calc_cpu_usage_pct(&usage_after, &usage_before, &ucpu_usage, &scpu_usage);
-        printf("%s (%d x %d): %.2f ops/sec (%.2f MB/s), CPU %d%% + %d%% = %d%%\n",
+        sprintf(s, "%s (%d x %d): %.2f ops/sec (%.2f MB/s), CPU %d%% + %d%% = %d%%",
             test_name[test], w, h, operation_count / dt,
             (operation_count / dt) * w * h * (bpp / 8) / (1024 * 1024),
             (int)ucpu_usage, (int)scpu_usage, (int)(ucpu_usage + scpu_usage));
     }
     else
-        printf("%s (%d x %d): %.2f ops/sec (%.2f MB/s)\n", test_name[test],
+        sprintf(s, "%s (%d x %d): %.2f ops/sec (%.2f MB/s)", test_name[test],
             w, h, operation_count / dt, (operation_count / dt) * w * h * (bpp / 8) / (1024 * 1024));
+    printf("%s\n", s);
     fflush(stdout);
+    print_text_graphical(s);
 }
 
 int check_test_available(int test) {
@@ -647,6 +698,10 @@ main(int argc, char *argv[])
   /* Hack, we assume the internal bits per pixel is 32 for depth 24. */
   if (depth == 24)
       bpp = 32;
+  XWindowAttributes root_window_attr;
+  XGetWindowAttributes(display, root_window, &root_window_attr);
+  screen_width = root_window_attr.width;
+  screen_height = root_window_attr.height;
 
   if (feature_render) {
     /* lookup a ARGB picture format */
@@ -1087,14 +1142,24 @@ main(int argc, char *argv[])
     int max_size = WINDOW_WIDTH;
     if (max_size > WINDOW_HEIGHT)
         max_size = WINDOW_HEIGHT;
+
+    char s[80];
+    sprintf(s, "Screen size %d x %d, depth %d (%d bpp), window size %d x %d", screen_width,
+        screen_height, depth, bpp, max_size, max_size);
+    printf("%s\n", s);
+    print_text_graphical(s);
+
     /*
      * Note: The destination coordinates on the root window vary from (0, 0) to (7, 7).
      */
     if (test == TEST_ALL) {
-        for (int i = 0; i < NU_TEST_TYPES - 1; i++)
-            if (check_test_available(i)) {
-                for (int size = 5; size + 8 <= max_size; size = size * 3 / 2)
-                    do_test(i, size, size);
+        for (int i = 0; i < NU_TEST_TYPES - 1; i++) {
+           int subtest = 0;
+           if (check_test_available(i)) {
+                for (int size = 5; size + 8 <= max_size; size = size * 3 / 2) {
+                    do_test(i, subtest, size, size);
+                    subtest++;
+                }
                 /* Draw a green dot to indicate the test is finished. */
                 if (bpp == 32)
                     values.foreground = 0x00007F00;
@@ -1104,10 +1169,15 @@ main(int argc, char *argv[])
                 XFillRectangle(display, root_window,
                    root_gc, i * 16 + 8, WINDOW_HEIGHT + 8, 8, 8);
             }
+        }
     }
-    else
-        for (int size = 5; size + 8 <= max_size; size = size * 3 / 2)
-            do_test(test, size, size);
+    else {
+        int subtest = 0;
+        for (int size = 5; size + 8 <= max_size; size = size * 3 / 2) {
+            do_test(test, subtest, size, size);
+            subtest++;
+        }
+    }
 
   XCloseDisplay(display);
 
