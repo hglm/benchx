@@ -44,6 +44,7 @@
 
 /*
  * The size of the area on the root window into which will be drawn.
+ * At the moment the width must be equal to the width.
  */
 #define DEFAULT_AREA_WIDTH 600
 #define DEFAULT_AREA_HEIGHT 600
@@ -56,6 +57,8 @@
 #define _POSIX_C_SOURCE 200112L
 #define _XOPEN_SOURCE_EXTENDED
 #define _ISOC99_SOURCE
+/* The following is for getpagesize(). */
+#define _BSD_SOURCE
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -643,8 +646,8 @@ main(int argc, char *argv[])
             "    --size <pixels>\n"
             "        Specifies the size of the area to be drawn into in pixels (n x n).\n"
             "        A larger size will allow subtests with a larger area to be performed.\n"
-            "        The default is 600.\n"
-            "Tests:\n", DEFAULT_TEST_DURATION);
+            "        The default is %d.\n"
+            "Tests:\n", DEFAULT_TEST_DURATION, DEFAULT_AREA_WIDTH);
         for (int i = 0; i < NU_TEST_TYPES; i++)
             printf("    %s\n", test_name[i]);
         return 0;
