@@ -8,15 +8,17 @@ Usage:
 
 where <testname> is one of the following:
 
-	CopyArea		Screen to screen blits.
-	AlignedCopyArea		Aligned screen to screen blits (e.g. vertical scrolling).
-	FillRect		Rectangle fill.
-	PutImage		Slow Putimage using Xlib pipes.
-        ShmPutImage		Faster Putimage using MIT shared memory.
-        AlignedShmPutImage	Same but destination x-coordinate is aligned to multiple of 8.
-        ShmPixmapCopy		CopyArea from shared memory pixmap to screen.
-        AlignedPixmapCopy	Same but destination position is aligned to multiple of 8.
-	All			Run all tests.
+	ScreenCopy			Screen to screen blits (using XCopyArea).
+	AlignedScreenCopy		Aligned screen to screen blits (e.g. vertical scrolling).
+	FillRect			Rectangle fill.
+	PutImage			Slow PutImage using Xlib communication socket.
+        ShmPutImage			Fast PutImage using MIT shared memory.
+        AlignedShmPutImage		Same but destination x-coordinate is aligned to multiple of 8.
+        ShmPixmapToScreenCopy		CopyArea from shared memory pixmap to screen.
+        AlignedPixmapToScreenCopy	Same but destination position is aligned to multiple of 8.
+	PixmapCopy			Copy pixmap to another pixmap (server-side).
+	PixmapFillRect			Rectangle fill of pixmap.
+	All				Run all tests.
 
 Run benchx without arguments for the full list.
 
@@ -29,6 +31,12 @@ benchx <testname> > benchx.out
 If you then start the X server using startx, it will automatically run the specified test,
 and the X server should exit after it is finished. A sample xinitrc file that runs all the tests
 is provided.
+
+The output includes the number of operations per second, the pixel bandwidth in
+MB/s, and if available the user and system CPU usage of the X server. The X server
+process name looked for is "Xorg".
+
+Running as root is helpful but not strictly necessary.
 
 Note about PutImage performance:
 

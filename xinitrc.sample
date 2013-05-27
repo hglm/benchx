@@ -1,5 +1,5 @@
-benchx CopyArea > benchx.out
-benchx AlignedCopyArea >> benchx.out
+benchx ScreenCopy > benchx.out
+benchx AlignedScreenCopy >> benchx.out
 benchx FillRect >> benchx.out
 benchx PutImage >> benchx.out
 benchx ShmPutImage >> benchx.out
