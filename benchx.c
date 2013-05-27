@@ -313,6 +313,9 @@ static void draw_text(int x, int y, const char *s) {
 }
 
 static void print_text_graphical(const char *s) {
+    /* Don't output graphical text when running in window mode. */
+    if (window_mode)
+        return;
     int max_lines = screen_height / 10;
     if (nu_lines == max_lines) {
         /* Scroll. */
@@ -900,7 +903,7 @@ main(int argc, char *argv[])
     XCreateWindow(display,
 		  root_window,
 		  0, 0,
-		  screen_width - 64, screen_height - 64,
+		  width, height + 32,
 		  0,              /* border_width */
 		  depth,          /* depth */
 		  InputOutput,    /* class */
