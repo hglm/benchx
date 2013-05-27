@@ -95,8 +95,8 @@ static int feature_shm_pixmap = False;
 static int feature_shm = False;
 
 static XGCValues gcvalues;
-static GC gc = None;
 static GC root_gc = None;
+static GC pixmap2_gc = None;
 
 static XImage *ximage = NULL;
 static XImage *shmximage_ximage = NULL;
@@ -367,27 +367,19 @@ static void test_iteration(int test, int i, int w, int h) {
             case TEST_PIXMAPCOPY :
                 XCopyArea(display,
                     pixmap1, pixmap2,
-                    root_gc,
+                    pixmap2_gc,
                     0, 0,
                     w, h,
                     i & 7, ((i / 8) & 7));
                 break;
             case TEST_PIXMAPFILLRECT :
                 XFillRectangle(display, pixmap1,
-                    root_gc, i & 7, ((i / 8) & 7), w, h);
+                    pixmap2_gc, i & 7, ((i / 8) & 7), w, h);
                 break;
             }
 }
 
 void do_test(int test, int w, int h) {
-    struct pstat usage_before, usage_after;
-    /* Get CPU usage statistics for the X server */
-    int no_usage;
-    if (X_pid == - 1)
-        no_usage = 1;
-    else
-        no_usage = get_usage(X_pid, &usage_before);
-
     int nu_iterations = 1000;
     int operation_count;
     int area = w * h;
@@ -477,20 +469,32 @@ void do_test(int test, int w, int h) {
     XFillRectangle(display, root_window,
                    root_gc, test * 16 + 8, WINDOW_HEIGHT + 8, 8, 8);
     /* For FillRect, set a random fill color. */
-    if (test == TEST_FILLRECT || test == TEST_PIXMAPFILLRECT) {
+    if (test == TEST_FILLRECT) {
         values.foreground = rand();
         XChangeGC(display, root_gc, GCForeground, &values);
+    }
+    if (test == TEST_PIXMAPFILLRECT) {
+        values.foreground = rand();
+        XChangeGC(display, pixmap2_gc, GCForeground, &values);
     }
 
     /* Warm-up caches etc. */
     for (int i = 0; i < 8; i++)
         test_iteration(test, i, w, h);
+    XSync(display, False);
+
+    struct pstat usage_before, usage_after;
+    /* Initialize CPU usage statistics for the X server. */
+    int no_usage;
+    if (X_pid == - 1)
+        no_usage = 1;
+    else
+        no_usage = get_usage(X_pid, &usage_before);
 
     struct timespec begin;
     struct timespec end;
     struct timespec duration;
-    /* be sure no pending request remaining */
-    XSync(display, False);
+    /* Make sure no pending request is remaining. */
     flush_xevent(display);
     XFlush(display);
     XSync(display, False);
@@ -507,7 +511,7 @@ void do_test(int test, int w, int h) {
         if (current.tv_sec >= begin.tv_sec + RUNNING_TIME_IN_SECONDS)
             break;
     }
-    /* be sure no pending request remaining */
+    /* Make sure no pending request is remaining. */
     XSync(display, False);
     clock_gettime(CLOCK_REALTIME, &end);
     double begin_t = (double)begin.tv_sec + (double)begin.tv_nsec / 1000000000.0;
@@ -518,13 +522,13 @@ void do_test(int test, int w, int h) {
         /* Get CPU usage statistics for the X server. */
         get_usage(X_pid, &usage_after);
         calc_cpu_usage_pct(&usage_after, &usage_before, &ucpu_usage, &scpu_usage);
-        printf("%s (%d x %d): ops/sec: %.2f (%.2f MB/s), CPU %d%% + %d%% = %d%%\n",
+        printf("%s (%d x %d): %.2f ops/sec (%.2f MB/s), CPU %d%% + %d%% = %d%%\n",
             test_name[test], w, h, operation_count / dt,
             (operation_count / dt) * w * h * (bpp / 8) / (1024 * 1024),
             (int)ucpu_usage, (int)scpu_usage, (int)(ucpu_usage + scpu_usage));
     }
     else
-        printf("%s (%d x %d): ops/sec: %.2f (%.2f MB/s)\n", test_name[test],
+        printf("%s (%d x %d): %.2f ops/sec (%.2f MB/s)\n", test_name[test],
             w, h, operation_count / dt, (operation_count / dt) * w * h * (bpp / 8) / (1024 * 1024));
     fflush(stdout);
 }
@@ -945,6 +949,19 @@ main(int argc, char *argv[])
 			 width,
 			 height,
 			 depth);
+  if (bpp == 32)
+      gcvalues.foreground = 0x00FFFFFF;
+  else
+      gcvalues.foreground = 0x0000FFFF;
+  gcvalues.background = 0;
+  pixmap2_gc = XCreateGC(display, pixmap2,
+                 (GCBackground |
+                  GCForeground |
+                  GCFunction |
+                  GCPlaneMask |
+                  GCClipMask |
+                  GCGraphicsExposures),
+                 &gcvalues);
 
   if (feature_shm_pixmap) {
     shmpixmap = XShmCreatePixmap(display,

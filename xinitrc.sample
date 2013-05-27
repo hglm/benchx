@@ -1,3 +1,4 @@
+xset s off
 benchx ScreenCopy > benchx.out
 benchx AlignedScreenCopy >> benchx.out
 benchx FillRect >> benchx.out

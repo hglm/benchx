@@ -23,18 +23,21 @@ where <testname> is one of the following:
 Run benchx without arguments for the full list.
 
 It is best run on a bare X server without a window manager, because otherwise the root window may be
-obscured. To do so, create or edit the file .xinitrc in your home directory so that has the single
-line:
+obscured. To do so, create or edit the file .xinitrc in your home directory so that has the two
+lines:
 
-benchx <testname> > benchx.out
+	xset s off
+	benchx <testname> > benchx.out
 
-If you then start the X server using startx, it will automatically run the specified test,
-and the X server should exit after it is finished. A sample xinitrc file that runs all the tests
-is provided.
+The first line disables the X screensaver. If you then start the X server using startx, it will
+automatically run the specified test, and the X server should exit after it is finished. A sample
+xinitrc file that runs all the tests is provided.
 
 The output includes the number of operations per second, the pixel bandwidth in
 MB/s, and if available the user and system CPU usage of the X server. The X server
-process name looked for is "Xorg".
+process name looked for is "Xorg". The CPU usage of benchx itself is not reported, but is should
+be low, except for FillRect at small sizes (Xlib overhead for lots of small requests), and basic
+PutImage at large sizes (moving large amounts of data through the X socket).
 
 Running as root is helpful but not strictly necessary.
 
