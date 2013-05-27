@@ -23,6 +23,12 @@ Options:
 
             Run in a window.
 
+	--size <pixels>
+
+	    Specifies the size of the area to be drawn into in pixels (n x n).
+            A larger size will allow subtests with a larger area to be performed.
+            The default is 600.
+
 <testname> is one of the following:
 
 	ScreenCopy			Screen to screen blits (using XCopyArea).

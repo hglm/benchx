@@ -45,8 +45,8 @@
 /*
  * The size of the area on the root window into which will be drawn.
  */
-#define AREA_WIDTH 600
-#define AREA_HEIGHT 600
+#define DEFAULT_AREA_WIDTH 600
+#define DEFAULT_AREA_HEIGHT 600
 
 /* The default running time in seconds for each subtest. */
 #define DEFAULT_TEST_DURATION 5
@@ -121,6 +121,8 @@ static Picture window_pict;
 static int X_pid;
 static int test_duration = DEFAULT_TEST_DURATION;
 static int window_mode = 0;
+static int area_width = DEFAULT_AREA_WIDTH;
+static int area_height = DEFAULT_AREA_HEIGHT;
 
 /*
  * Get pid of process by name.
@@ -320,18 +322,18 @@ static void print_text_graphical(const char *s) {
     if (nu_lines == max_lines) {
         /* Scroll. */
         XCopyArea(display, window, window, window_gc,
-            AREA_WIDTH + 16, 10,
-            screen_width - (AREA_WIDTH + 16), (max_lines - 1) * 10,
-            AREA_WIDTH + 16, 0);
+            area_width + 16, 10,
+            screen_width - (area_width + 16), (max_lines - 1) * 10,
+            area_width + 16, 0);
         XGCValues values;
         values.foreground = 0;
         XChangeGC(display, window_gc, GCForeground, &values);
         XFillRectangle(display, window, window_gc,
-            AREA_WIDTH + 16, (max_lines - 1) * 10,
-            screen_width - (AREA_WIDTH + 16), 10);
+            area_width + 16, (max_lines - 1) * 10,
+            screen_width - (area_width + 16), 10);
         nu_lines--;
    }
-   draw_text(AREA_WIDTH + 16, nu_lines * 10, s);
+   draw_text(area_width + 16, nu_lines * 10, s);
    nu_lines++;
 }
 
@@ -483,7 +485,7 @@ void do_test(int test, int subtest, int w, int h) {
     }
 
     unsigned int c = rand();
-    for (int i = 0; i < AREA_WIDTH * AREA_HEIGHT * (bpp / 8); i++) {
+    for (int i = 0; i < area_width * area_height * (bpp / 8); i++) {
             *((unsigned char *)data + i) = c & 0xFF;
             c += 0x7E7E7E7E;
             if ((i & 255) == 255)
@@ -495,10 +497,10 @@ void do_test(int test, int subtest, int w, int h) {
 		ximage, 
 		0, 0, 
 		0, 0, 
-		AREA_WIDTH, AREA_HEIGHT);
+		area_width, area_height);
     if (test == TEST_SHMPUTIMAGE || test == TEST_ALIGNEDSHMPUTIMAGE) {
         unsigned int c = rand();
-        for (int i = 0; i < AREA_WIDTH * AREA_HEIGHT * (bpp / 8); i++) {
+        for (int i = 0; i < area_width * area_height * (bpp / 8); i++) {
             *((unsigned char *)shmdata_ximage + i) = c & 0xFF;
             c += 0x7E7E7E7E;
             if ((i & 255) == 255)
@@ -508,7 +510,7 @@ void do_test(int test, int subtest, int w, int h) {
     if (test == TEST_SHMPIXMAPTOSCREENCOPY || test == TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY
     || test == TEST_PIXMAPCOPY) {
         unsigned int c = rand();
-        for (int i = 0; i < AREA_WIDTH * AREA_HEIGHT * (bpp / 8); i++) {
+        for (int i = 0; i < area_width * area_height * (bpp / 8); i++) {
             *((unsigned char *)shmdata_pixmap + i) = rand() & 0xFF;
             c += 0x7E7E7E7E;
             if ((i & 255) == 255)
@@ -520,7 +522,7 @@ void do_test(int test, int subtest, int w, int h) {
     values.foreground = 0xFFFFFFFF;
     XChangeGC(display, window_gc, GCForeground, &values);
     XFillRectangle(display, window,
-                   window_gc, test * 16 + 8, AREA_HEIGHT + 8, 8, 8);
+                   window_gc, test * 16 + 8, area_height + 8, 8, 8);
     /* For FillRect, set a random fill color. */
     if (test == TEST_FILLRECT) {
         values.foreground = rand();
@@ -626,9 +628,6 @@ main(int argc, char *argv[])
   int major;
   int minor;
 
-  unsigned int width = AREA_WIDTH;
-  unsigned int height = AREA_HEIGHT;
-
   int prio;
   int sched;
   struct sched_param param;
@@ -641,6 +640,10 @@ main(int argc, char *argv[])
             "        Specifies the duration of each subtest in seconds. Default %d.\n"
             "    --window\n"
             "        Draw on a window instead of on the root window.\n"
+            "    --size <pixels>\n"
+            "        Specifies the size of the area to be drawn into in pixels (n x n).\n"
+            "        A larger size will allow subtests with a larger area to be performed.\n"
+            "        The default is 600.\n"
             "Tests:\n", DEFAULT_TEST_DURATION);
         for (int i = 0; i < NU_TEST_TYPES; i++)
             printf("    %s\n", test_name[i]);
@@ -663,6 +666,17 @@ main(int argc, char *argv[])
         if (strcasecmp(argv[argi], "--window") == 0) {
             window_mode = 1;
             argi++;
+            continue;
+        }
+        if (strcasecmp(argv[argi], "--size") == 0 && argi + 1 < argc) {
+            int size = atoi(argv[argi + 1]);
+            if (size < 100 || size > 4096) {
+                printf("Invalid size of drawing area (%d)\n", size);
+                return 1;
+            }
+            area_width = size;
+            area_height = size;
+            argi += 2;
             continue;
         }
         break;
@@ -738,6 +752,12 @@ main(int argc, char *argv[])
   XGetWindowAttributes(display, root_window, &root_window_attr);
   screen_width = root_window_attr.width;
   screen_height = root_window_attr.height;
+
+    if (area_width + 16 > screen_width || area_height + 32 > screen_height) {
+        fprintf(stderr, "Drawing area too large (area size %d x %d, screen size %d x %d).\n",
+            area_width, area_height, screen_width, screen_height);
+        return 1;
+    }
 
   if (feature_render) {
     /* lookup a ARGB picture format */
@@ -903,7 +923,7 @@ main(int argc, char *argv[])
     XCreateWindow(display,
 		  root_window,
 		  0, 0,
-		  width, height + 32,
+		  area_width + 16, area_height + 32,
 		  0,              /* border_width */
 		  depth,          /* depth */
 		  InputOutput,    /* class */
@@ -926,7 +946,7 @@ main(int argc, char *argv[])
 		   colormap);
 
   /* create basic XImage used for XPutImage() */
-  data = (uint8_t *) malloc(width * height * (bpp / 8));
+  data = (uint8_t *) malloc(area_width * area_height * (bpp / 8));
   if (data == NULL) {
     perror("malloc()");
     return 1;
@@ -938,10 +958,10 @@ main(int argc, char *argv[])
 			ZPixmap, /* format */
 			0,
 			(char *)data,
-			width,
-			height,
+			area_width,
+			area_height,
 			32, /* bitmap pad: 32bits */
-		        width * (bpp / 8));  /* bytes per line */
+		        area_width * (bpp / 8));  /* bytes per line */
   if (ximage == NULL) {
     fprintf(stderr, "Can't create XImage\n");
     return 1;
@@ -962,8 +982,8 @@ main(int argc, char *argv[])
 				       ZPixmap,
 				       NULL,
 				       &shminfo_ximage,
-				       width,
-				       height);
+				       area_width,
+				       area_height);
     
     if (shmximage_ximage == NULL) {
       fprintf(stderr, "Can't create XImage for SHM\n");
@@ -1012,8 +1032,8 @@ main(int argc, char *argv[])
 				       ZPixmap,
 				       NULL,
 				       &shminfo_pixmap,
-				       width,
-				       height);
+				       area_width,
+				       area_height);
 
     if (shmximage_pixmap == NULL) {
       fprintf(stderr, "Can't create XImage for SHM Pixmap\n");
@@ -1065,13 +1085,13 @@ main(int argc, char *argv[])
   /* create pixmaps */
   pixmap1 = XCreatePixmap(display,
 			 window, 
-			 width,
-			 height,
+			 area_width,
+			 area_height,
 			 depth);
   pixmap2 = XCreatePixmap(display,
 			 window, 
-			 width,
-			 height,
+			 area_width,
+			 area_height,
 			 depth);
   if (bpp == 32)
       gcvalues.foreground = 0x00FFFFFF;
@@ -1092,8 +1112,8 @@ main(int argc, char *argv[])
 				 window,
 				 shminfo_pixmap.shmaddr,
 				 &shminfo_pixmap,
-				 width,
-				 height,
+				 area_width,
+				 area_height,
 				 depth);
   }
 
@@ -1234,12 +1254,12 @@ main(int argc, char *argv[])
     XChangeGC(display, window_gc, GCForeground, &values);
     for (int i = 0; i < NU_TEST_TYPES - 1; i++) {
         XFillRectangle(display, window,
-                       window_gc, i * 16 + 8, AREA_HEIGHT + 8, 8, 8);
+                       window_gc, i * 16 + 8, area_height + 8, 8, 8);
     }
 
-    int max_size = AREA_WIDTH;
-    if (max_size > AREA_HEIGHT)
-        max_size = AREA_HEIGHT;
+    int max_size = area_width;
+    if (max_size > area_height)
+        max_size = area_height;
 
     char s[80];
     sprintf(s, "Screen size %d x %d, depth %d (%d bpp), area size %d x %d", screen_width,
@@ -1265,7 +1285,7 @@ main(int argc, char *argv[])
                     values.foreground = 0x000003E0;
                 XChangeGC(display, window_gc, GCForeground, &values);
                 XFillRectangle(display, window,
-                   window_gc, i * 16 + 8, AREA_HEIGHT + 8, 8, 8);
+                   window_gc, i * 16 + 8, area_height + 8, 8, 8);
             }
         }
     }
