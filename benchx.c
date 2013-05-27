@@ -750,7 +750,7 @@ main(int argc, char *argv[])
         /* try to lookup a RGB visual */
         count = 0;
         xvinfo_template.screen = screen;
-        xvinfo_template.depth = 32;
+        xvinfo_template.depth = 24;
         xvinfo_template.class = TrueColor;
         xvinfo_template.red_mask = 0xff0000;
         xvinfo_template.green_mask = 0x00ff00;
@@ -779,7 +779,7 @@ main(int argc, char *argv[])
       fprintf(stderr, "No visual matching criteria\n");
     } else {
       for(i = 0; i < count; i++) {      
-	if (xvinfos[i].depth == bpp) {
+	if (xvinfos[i].depth == depth) {
 	  visual = xvinfos[i].visual;
 	  break;
 	}
