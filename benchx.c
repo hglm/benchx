@@ -1085,7 +1085,7 @@ main(int argc, char *argv[])
                     values.foreground = 0x000003E0;
                 XChangeGC(display, root_gc, GCForeground, &values);
                 XFillRectangle(display, root_window,
-                   root_gc, test * 16 + 8, WINDOW_HEIGHT + 8, 8, 8);
+                   root_gc, i * 16 + 8, WINDOW_HEIGHT + 8, 8, 8);
             }
     }
     else
