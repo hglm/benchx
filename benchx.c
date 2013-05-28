@@ -88,6 +88,10 @@
 
 #include "font.h"
 
+#define bool int
+#define true 1
+#define false 0
+
 static Display *display = NULL;
 static Window root_window = None;
 static Visual  *visual = NULL;
@@ -340,7 +344,9 @@ static void print_text_graphical(const char *s) {
    nu_lines++;
 }
 
-#define NU_TEST_TYPES 11
+#define NU_TESTS 11
+#define NU_CORE_TESTS 10
+#define NU_TEST_NAMES 13
 #define TEST_SCREENCOPY 0
 #define TEST_ALIGNEDSCREENCOPY 1
 #define TEST_FILLRECT 2
@@ -351,11 +357,15 @@ static void print_text_graphical(const char *s) {
 #define TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY 7
 #define TEST_PIXMAPCOPY 8
 #define TEST_PIXMAPFILLRECT 9
-#define TEST_ALL 10
+#define TEST_POINT 10
+#define TEST_CORE 11
+#define TEST_ALL 12
 
 static const char *test_name[] = {
     "ScreenCopy", "AlignedScreenCopy", "FillRect", "PutImage", "ShmPutImage", "AlignedShmPutImage",
-    "ShmPixmapToScreenCopy", "AlignedShmPixmapToScreenCopy", "PixmapCopy", "PixmapFillRect", "All"
+    "ShmPixmapToScreenCopy", "AlignedShmPixmapToScreenCopy", "PixmapCopy", "PixmapFillRect",
+    "Point",
+    "Core", "All"
 };
 
 static void test_iteration(int test, int i, int w, int h) {
@@ -435,7 +445,11 @@ static void test_iteration(int test, int i, int w, int h) {
                 XFillRectangle(display, pixmap2,
                     pixmap2_gc, i & 7, ((i / 8) & 7), w, h);
                 break;
-            }
+            case TEST_POINT :
+                XDrawPoint(display, window,
+                    window_gc, i & 7, ((i / 8) & 7));
+                break;
+           }
 }
 
 void do_test(int test, int subtest, int w, int h) {
@@ -485,6 +499,9 @@ void do_test(int test, int subtest, int w, int h) {
         if (area < 1000)
             nu_iterations = 32768;
         break;
+    case TEST_POINT :
+        nu_iterations = 32768;
+        break;
     }
 
     unsigned int c = rand();
@@ -526,8 +543,8 @@ void do_test(int test, int subtest, int w, int h) {
     XChangeGC(display, window_gc, GCForeground, &values);
     XFillRectangle(display, window,
                    window_gc, test * 16 + 8, area_height + 8, 8, 8);
-    /* For FillRect, set a random fill color. */
-    if (test == TEST_FILLRECT) {
+    /* For FillRect or Dot, set a random fill color. */
+    if (test == TEST_FILLRECT || test == TEST_POINT) {
         values.foreground = rand();
         XChangeGC(display, window_gc, GCForeground, &values);
     }
@@ -648,7 +665,7 @@ main(int argc, char *argv[])
             "        A larger size will allow subtests with a larger area to be performed.\n"
             "        The default is %d.\n"
             "Tests:\n", DEFAULT_TEST_DURATION, DEFAULT_AREA_WIDTH);
-        for (int i = 0; i < NU_TEST_TYPES; i++)
+        for (int i = 0; i < NU_TEST_NAMES; i++)
             printf("    %s\n", test_name[i]);
         return 0;
     }
@@ -1227,7 +1244,7 @@ main(int argc, char *argv[])
   }
 
     int test = - 1;
-    for (int i = 0; i < NU_TEST_TYPES; i++)
+    for (int i = 0; i < NU_TEST_NAMES; i++)
         if (strcasecmp(argv[argi], test_name[i]) == 0) {
             test = i;
             break;
@@ -1237,7 +1254,7 @@ main(int argc, char *argv[])
         return 1;
     }
 
-    if (test != TEST_ALL)
+    if (test != TEST_ALL && test != TEST_CORE)
         if (!check_test_available(test))
             return 1;
 
@@ -1247,15 +1264,36 @@ main(int argc, char *argv[])
 
     sleep(2);
 
-
-    /* Draw dots to indicate which test is being run. */
+    bool include_test[NU_TESTS];
     XGCValues values;
-    if (bpp == 32)
-        values.foreground = 0x000000FF;
-    else
-        values.foreground = 0x0000001F;
-    XChangeGC(display, window_gc, GCForeground, &values);
-    for (int i = 0; i < NU_TEST_TYPES - 1; i++) {
+    for (int i = 0; i < NU_TESTS; i++) {
+        include_test[i] = false;
+        if (test == TEST_ALL)
+            include_test[i] = true;
+        else
+        if (test == TEST_CORE) {
+            if (i < NU_CORE_TESTS)
+                include_test[i] = true;
+        }
+        else
+        if (i == test)
+            include_test[i] = true;
+        /* Draw dots to indicate which test is will be run. */
+        if (include_test[i]) {
+            /* Blue if it will be run. */
+            if (bpp == 32)
+                values.foreground = 0x000000FF;
+            else
+                values.foreground = 0x0000001F;
+        }
+        else {
+            /* Red if it will not be run. */
+            if (bpp == 32)
+                values.foreground = 0x00FF0000;
+            else
+                values.foreground = 0x0000F800;
+        }
+        XChangeGC(display, window_gc, GCForeground, &values);
         XFillRectangle(display, window,
                        window_gc, i * 16 + 8, area_height + 8, 8, 8);
     }
@@ -1273,34 +1311,28 @@ main(int argc, char *argv[])
     /*
      * Note: The destination coordinates on the root window vary from (0, 0) to (7, 7).
      */
-    if (test == TEST_ALL) {
-        for (int i = 0; i < NU_TEST_TYPES - 1; i++) {
-           int subtest = 0;
-           if (check_test_available(i)) {
+   for (int i = 0; i < NU_TESTS; i++)
+       if (include_test[i] && check_test_available(i)) {
+            if (i == TEST_POINT)
+                do_test(i, 0, 1, 1);
+            else { 
+                int subtest = 0;
                 for (int size = 5; size + 8 <= max_size; size = size * 3 / 2) {
                     do_test(i, subtest, size, size);
                     subtest++;
                 }
-                /* Draw a green dot to indicate the test is finished. */
-                if (bpp == 32)
-                    values.foreground = 0x00007F00;
-                else
-                    values.foreground = 0x000003E0;
-                XChangeGC(display, window_gc, GCForeground, &values);
-                XFillRectangle(display, window,
-                   window_gc, i * 16 + 8, area_height + 8, 8, 8);
             }
-        }
-    }
-    else {
-        int subtest = 0;
-        for (int size = 5; size + 8 <= max_size; size = size * 3 / 2) {
-            do_test(test, subtest, size, size);
-            subtest++;
-        }
-    }
+            /* Draw a green dot to indicate the test is finished. */
+            if (bpp == 32)
+                values.foreground = 0x00007F00;
+            else
+                values.foreground = 0x000003E0;
+            XChangeGC(display, window_gc, GCForeground, &values);
+            XFillRectangle(display, window,
+                window_gc, i * 16 + 8, area_height + 8, 8, 8);
+       }
 
-  XCloseDisplay(display);
+    XCloseDisplay(display);
 
-  return 0;
+    return 0;
 }
