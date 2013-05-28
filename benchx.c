@@ -738,7 +738,7 @@ void do_test(int test, int subtest, int w, int h) {
         pixels = w;
     else
     if (test == TEST_FILLCIRCLE)
-        pixels = 0.5 * M_PI * 0.25 * w;
+        pixels = 0.5 * M_PI * 0.25 * w * w;
     else
     if (test == TEST_TEXT8X13) {
         pixels = 8 * 13 * w * h;
