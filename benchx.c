@@ -729,7 +729,7 @@ int check_test_available(int test) {
     }
     if ((test == TEST_SHMPIXMAPTOSCREENCOPY
     || test == TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY)
-        && !feature_shm_pixmap) {
+    && !feature_shm_pixmap) {
         printf("Cannot run test %s because SHM pixmap is not supported.\n",
             test_name[test]);
         return 0;
@@ -740,10 +740,15 @@ int check_test_available(int test) {
     if (test == TEST_TEXT10X20) {
         return X_font_10x20 != NULL;
     }
+    if (test == TEST_XRENDERSHMPIXMAP && !feature_shm_pixmap) {
+        printf("Cannot run test %s because SHM pixmap is not supported.\n",
+            test_name[test]);
+        return 0;
+    }
     if ((test == TEST_XRENDERSHMPIXMAPALPHA || test == TEST_XRENDERSHMPIXMAPALPHATOPIXMAP)
-    && !(feature_shm && visual_alpha != NULL)) {
-        if (!feature_shm)
-            printf("Cannot run test %s because SHM is not supported.\n",
+    && !(feature_shm_pixmap && visual_alpha != NULL)) {
+        if (!feature_shm_pixmap)
+            printf("Cannot run test %s because SHM pixmap is not supported.\n",
                 test_name[test]);
         else
             printf
