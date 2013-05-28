@@ -42,7 +42,7 @@ Options:
         ShmPutImage			Fast PutImage using MIT shared memory.
         AlignedShmPutImage		Same but destination x-coordinate is aligned to multiple of 8.
         ShmPixmapToScreenCopy		CopyArea from shared memory pixmap to screen.
-        AlignedPixmapToScreenCopy	Same but destination position is aligned to multiple of 8.
+        AlignedShmPixmapToScreenCopy	Same but destination position is aligned to multiple of 8.
 	PixmapCopy			Copy pixmap to another pixmap (server-side).
 	PixmapFillRect			Rectangle fill of pixmap.
         Point                           Draw a single pixel using XDrawPoint.
@@ -50,7 +50,7 @@ Options:
         FillCircle                      Filled circle using XFillArc.
         Text8x13			Draw text with 8x13 fixed font.
         Text10x20                       Draw text with 10x20 fixed font.
-        XRenderShmImage                 ShmPutimage to a pixmap and then copy to screen using Xrender.
+        XRenderShmImage                 ShmPutimage to a pixmap and then copy to screen using XRender.
         XRenderShmPixmap                Copy shared memory pixmap to screen using XRender.
         XRenderShmPixmapAlpha           Copy shared memory pixmap with alpha component to screen
                                         using XRender.
@@ -89,7 +89,7 @@ process name looked for is "Xorg". The CPU usage of benchx itself is not reporte
 be low, except for FillRect at small sizes (Xlib overhead for lots of small requests), and basic
 PutImage at large sizes (moving large amounts of data through the X socket).
 
-A tool to compare output results is provided (benchxcomp), which takes to output files as arguments
+A tool to compare output results is provided (benchxcomp), which takes two output files as arguments
 and shows signficant speed-ups, slow-downs and differences in X server CPU usage between the two
 tests.
 
