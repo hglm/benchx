@@ -66,6 +66,7 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <math.h>
 #include <glob.h>
 
 #include <X11/Xlib.h>
@@ -344,9 +345,9 @@ static void print_text_graphical(const char *s) {
    nu_lines++;
 }
 
-#define NU_TESTS 11
+#define NU_TESTS 13
 #define NU_CORE_TESTS 10
-#define NU_TEST_NAMES 13
+#define NU_TEST_NAMES 15
 #define TEST_SCREENCOPY 0
 #define TEST_ALIGNEDSCREENCOPY 1
 #define TEST_FILLRECT 2
@@ -358,13 +359,15 @@ static void print_text_graphical(const char *s) {
 #define TEST_PIXMAPCOPY 8
 #define TEST_PIXMAPFILLRECT 9
 #define TEST_POINT 10
-#define TEST_CORE 11
-#define TEST_ALL 12
+#define TEST_LINE 11
+#define TEST_FILLCIRCLE 12
+#define TEST_CORE 13
+#define TEST_ALL 14
 
 static const char *test_name[] = {
     "ScreenCopy", "AlignedScreenCopy", "FillRect", "PutImage", "ShmPutImage", "AlignedShmPutImage",
     "ShmPixmapToScreenCopy", "AlignedShmPixmapToScreenCopy", "PixmapCopy", "PixmapFillRect",
-    "Point",
+    "Point", "Line", "FillCircle",
     "Core", "All"
 };
 
@@ -449,7 +452,16 @@ static void test_iteration(int test, int i, int w, int h) {
                 XDrawPoint(display, window,
                     window_gc, i & 7, ((i / 8) & 7));
                 break;
-           }
+            case TEST_LINE :
+                XDrawLine(display, window, window_gc,
+                    (i & 1) * w + (i & 7), ((i & 2) >> 1) * h +((i / 8) & 7),
+                    ((i & 1) ^ 1) * w + (i & 7), (((i & 2) >> 1) ^ 1) * h + ((i / 8) & 7));
+                break;
+            case TEST_FILLCIRCLE :
+                XFillArc(display, window, window_gc,
+                    i & 7, (i / 8) & 7, w, h, 0, 360 * 64);
+                break;
+            }
 }
 
 void do_test(int test, int subtest, int w, int h) {
@@ -502,6 +514,22 @@ void do_test(int test, int subtest, int w, int h) {
     case TEST_POINT :
         nu_iterations = 32768;
         break;
+    case TEST_LINE :
+        nu_iterations = 1024;
+        if (w < 300)
+            nu_iterations = 2048;
+        if (w < 100)
+            nu_iterations = 8192;
+        if (w < 10)
+            nu_iterations = 32768;
+        break;
+    case TEST_FILLCIRCLE :
+        nu_iterations = 64;
+        if (area < 10000)
+            nu_iterations = 1024;
+        if (area < 1000)
+            nu_iterations = 8192;
+        break;
     }
 
     unsigned int c = rand();
@@ -543,14 +571,23 @@ void do_test(int test, int subtest, int w, int h) {
     XChangeGC(display, window_gc, GCForeground, &values);
     XFillRectangle(display, window,
                    window_gc, test * 16 + 8, area_height + 8, 8, 8);
-    /* For FillRect or Dot, set a random fill color. */
-    if (test == TEST_FILLRECT || test == TEST_POINT) {
+    /* For FillRect, Point or Line, set a random fill color. */
+    if (test == TEST_FILLRECT || test == TEST_POINT || test == TEST_LINE ||
+    test == TEST_FILLCIRCLE) {
         values.foreground = rand();
         XChangeGC(display, window_gc, GCForeground, &values);
     }
     if (test == TEST_PIXMAPFILLRECT) {
         values.foreground = rand();
         XChangeGC(display, pixmap2_gc, GCForeground, &values);
+    }
+    if (test == TEST_LINE) {
+        values.line_width = 1;
+        XChangeGC(display, window_gc, GCLineWidth, &values);
+    }
+    if (test == TEST_FILLCIRCLE) {
+        values.arc_mode = ArcChord;
+        XChangeGC(display, window_gc, GCArcMode, &values);
     }
 
     /* Warm-up caches etc. */
@@ -593,6 +630,14 @@ void do_test(int test, int subtest, int w, int h) {
     double end_t = (double)end.tv_sec + (double)end.tv_nsec / 1000000000.0;
     double dt = end_t - begin_t;
     char s[256];
+    int pixels;
+    if (test == TEST_LINE)
+        pixels = w;
+    else
+    if (test == TEST_FILLCIRCLE)
+        pixels = 0.5 * M_PI * 0.25 * w;
+    else
+        pixels = w * h;
     if (!no_usage) {
         double ucpu_usage, scpu_usage;
         /* Get CPU usage statistics for the X server. */
@@ -600,12 +645,12 @@ void do_test(int test, int subtest, int w, int h) {
         calc_cpu_usage_pct(&usage_after, &usage_before, &ucpu_usage, &scpu_usage);
         sprintf(s, "%s (%d x %d): %.2f ops/sec (%.2f MB/s), CPU %d%% + %d%% = %d%%",
             test_name[test], w, h, operation_count / dt,
-            (operation_count / dt) * w * h * (bpp / 8) / (1024 * 1024),
+            (operation_count / dt) * pixels * (bpp / 8) / (1024 * 1024),
             (int)ucpu_usage, (int)scpu_usage, (int)(ucpu_usage + scpu_usage));
     }
     else
         sprintf(s, "%s (%d x %d): %.2f ops/sec (%.2f MB/s)", test_name[test],
-            w, h, operation_count / dt, (operation_count / dt) * w * h * (bpp / 8) / (1024 * 1024));
+            w, h, operation_count / dt, (operation_count / dt) * pixels * (bpp / 8) / (1024 * 1024));
     printf("%s\n", s);
     fflush(stdout);
     print_text_graphical(s);
