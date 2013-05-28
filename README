@@ -41,6 +41,12 @@ Options:
         AlignedPixmapToScreenCopy	Same but destination position is aligned to multiple of 8.
 	PixmapCopy			Copy pixmap to another pixmap (server-side).
 	PixmapFillRect			Rectangle fill of pixmap.
+        Point                           Draw a single pixel using XDrawPoint.
+        Line                            Draw a line using XDrawLine
+        FillCircle                      Filled circle using XFillArc.
+        Text8x13			Draw text with 8x13 fixed font.
+        Text10x20                       Draw text with 10x20 fixed font.
+        Core                            Run core tests (the first ten).
 	All				Run all tests.
 
 Run benchx without arguments for the full list.

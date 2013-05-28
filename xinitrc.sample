@@ -1,12 +1,3 @@
 xset s off
-benchx ScreenCopy > benchx.out
-benchx AlignedScreenCopy >> benchx.out
-benchx FillRect >> benchx.out
-benchx PutImage >> benchx.out
-benchx ShmPutImage >> benchx.out
-benchx AlignedShmPutImage >> benchx.out
-benchx ShmPixmapToScreenCopy >> benchx.out
-benchx AlignedShmPixmapToScreenCopy >> benchx.out
-benchx PixmapCopy >> benchx.out
-benchx PixmapFillRect >> benchx.out
+benchx All > benchx.out
  

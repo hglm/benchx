@@ -131,6 +131,7 @@ static int test_duration = DEFAULT_TEST_DURATION;
 static int window_mode = 0;
 static int area_width = DEFAULT_AREA_WIDTH;
 static int area_height = DEFAULT_AREA_HEIGHT;
+static XFontStruct *X_font_8x13, *X_font_10x20;
 
 /*
  * Get pid of process by name.
@@ -345,9 +346,9 @@ static void print_text_graphical(const char *s) {
    nu_lines++;
 }
 
-#define NU_TESTS 13
+#define NU_TESTS 15
 #define NU_CORE_TESTS 10
-#define NU_TEST_NAMES 15
+#define NU_TEST_NAMES 17
 #define TEST_SCREENCOPY 0
 #define TEST_ALIGNEDSCREENCOPY 1
 #define TEST_FILLRECT 2
@@ -361,14 +362,27 @@ static void print_text_graphical(const char *s) {
 #define TEST_POINT 10
 #define TEST_LINE 11
 #define TEST_FILLCIRCLE 12
-#define TEST_CORE 13
-#define TEST_ALL 14
+#define TEST_TEXT8X13 13
+#define TEST_TEXT10X20 14
+#define TEST_CORE 15
+#define TEST_ALL 16
 
 static const char *test_name[] = {
     "ScreenCopy", "AlignedScreenCopy", "FillRect", "PutImage", "ShmPutImage", "AlignedShmPutImage",
     "ShmPixmapToScreenCopy", "AlignedShmPixmapToScreenCopy", "PixmapCopy", "PixmapFillRect",
-    "Point", "Line", "FillCircle",
+    "Point", "Line", "FillCircle", "Text8x13", "Text10x20",
     "Core", "All"
+};
+
+static const char *image_string_text = {
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 };
 
 static void test_iteration(int test, int i, int w, int h) {
@@ -461,6 +475,16 @@ static void test_iteration(int test, int i, int w, int h) {
                 XFillArc(display, window, window_gc,
                     i & 7, (i / 8) & 7, w, h, 0, 360 * 64);
                 break;
+            case TEST_TEXT8X13 :
+                for (int j = 0; j < h; j++)
+                    XDrawImageString(display, window, window_gc,
+                        i & 7, X_font_8x13->ascent + j * 13, image_string_text, w);
+                break;
+            case TEST_TEXT10X20 :
+                for (int j = 0; j < h; j++)
+                    XDrawImageString(display, window, window_gc,
+                        i & 7, X_font_10x20->ascent + j * 20, image_string_text, w);
+                break;
             }
 }
 
@@ -530,6 +554,14 @@ void do_test(int test, int subtest, int w, int h) {
         if (area < 1000)
             nu_iterations = 8192;
         break;
+    case TEST_TEXT8X13 :
+    case TEST_TEXT10X20 :
+        nu_iterations = 128;
+        if (w < 30)
+            nu_iterations = 512;
+        if (w < 10)
+            nu_iterations = 2048;
+        break;
     }
 
     unsigned int c = rand();
@@ -571,11 +603,16 @@ void do_test(int test, int subtest, int w, int h) {
     XChangeGC(display, window_gc, GCForeground, &values);
     XFillRectangle(display, window,
                    window_gc, test * 16 + 8, area_height + 8, 8, 8);
-    /* For FillRect, Point or Line, set a random fill color. */
+    /* Set a random foreground color for tests that require it. */
     if (test == TEST_FILLRECT || test == TEST_POINT || test == TEST_LINE ||
     test == TEST_FILLCIRCLE) {
         values.foreground = rand();
         XChangeGC(display, window_gc, GCForeground, &values);
+    }
+    if (test == TEST_TEXT8X13 || test == TEST_TEXT10X20) {
+        values.foreground = 0xFFFFFF;
+        values.background = 0;
+        XChangeGC(display, window_gc, GCForeground | GCBackground, &values);
     }
     if (test == TEST_PIXMAPFILLRECT) {
         values.foreground = rand();
@@ -588,6 +625,12 @@ void do_test(int test, int subtest, int w, int h) {
     if (test == TEST_FILLCIRCLE) {
         values.arc_mode = ArcChord;
         XChangeGC(display, window_gc, GCArcMode, &values);
+    }
+    if (test == TEST_TEXT8X13) {
+        XSetFont(display, window_gc, X_font_8x13->fid);
+    }
+    if (test == TEST_TEXT10X20) {
+        XSetFont(display, window_gc, X_font_10x20->fid);
     }
 
     /* Warm-up caches etc. */
@@ -637,6 +680,18 @@ void do_test(int test, int subtest, int w, int h) {
     if (test == TEST_FILLCIRCLE)
         pixels = 0.5 * M_PI * 0.25 * w;
     else
+    if (test == TEST_TEXT8X13) {
+        pixels = 8 * 13 * w * h;
+        w *= 8;
+        h *= 13;
+    }
+    else
+    if (test == TEST_TEXT10X20) {
+        pixels = 10 * 20 * w * h;
+        w *= 10;
+        h *= 20;
+    }
+    else
         pixels = w * h;
     if (!no_usage) {
         double ucpu_usage, scpu_usage;
@@ -665,6 +720,12 @@ int check_test_available(int test) {
     && !feature_shm_pixmap) {
         printf("Cannot run test %s because SHM pixmap is not supported.\n", test_name[test]);
         return 0;
+    }
+    if (test == TEST_TEXT8X13) {
+        return X_font_8x13 != NULL;
+    }
+    if (test == TEST_TEXT10X20) {
+        return X_font_10x20 != NULL;
     }
     return 1;
 }
@@ -748,8 +809,8 @@ main(int argc, char *argv[])
     }
     if (!window_mode)
         fprintf(stderr, "If you don't see any graphical output, the root window may be obscured.\n"
-            "Results will not be meaningful. Consider using the --window option or run on a bare\n"
-            "X server.\n");
+            "Results will not be meaningful. Consider using the --window option or run on a\n"
+            "bare X server.\n");
 
   pid = getpid();
 
@@ -1299,15 +1360,9 @@ main(int argc, char *argv[])
         return 1;
     }
 
-    if (test != TEST_ALL && test != TEST_CORE)
-        if (!check_test_available(test))
-            return 1;
-
     X_pid = find_pid("Xorg");
     if (X_pid == - 1)
         fprintf(stderr, "Couldn't find pid of X server.\n");
-
-    sleep(2);
 
     bool include_test[NU_TESTS];
     XGCValues values;
@@ -1342,6 +1397,56 @@ main(int argc, char *argv[])
         XFillRectangle(display, window,
                        window_gc, i * 16 + 8, area_height + 8, 8, 8);
     }
+    int nu_fonts;
+    char **font_name;
+    XFontStruct *font_info;
+    if (include_test[TEST_TEXT8X13] || include_test[TEST_TEXT10X20]) {
+    }
+
+    if (include_test[TEST_TEXT8X13]) {
+        font_name = XListFontsWithInfo(display,
+            "-misc-fixed-*-*-*-*-13-*-*-*-c-*-iso8859-1",
+            256, &nu_fonts, &font_info);
+        int i;
+        for (i = 0; i < nu_fonts; i++) {
+            int w = font_info[i].max_bounds.rbearing - font_info[i].min_bounds.lbearing;
+            int h = font_info[i].ascent + font_info[i].descent;
+//            printf("%s, w = %d, h = %d\n", font_name[i], w, h);
+            if (font_info[i].per_char == NULL && w == 8 && h == 13)
+                break;
+        }
+        X_font_8x13 = NULL;
+        if (i < nu_fonts)
+            X_font_8x13 = XLoadQueryFont(display, font_name[i]);
+        if (X_font_8x13 == NULL)
+            fprintf(stderr, "Could not load 8x13 font.\n");
+        XFreeFontInfo(font_name, font_info, nu_fonts);
+    }
+    if (include_test[TEST_TEXT10X20]) {
+        font_name = XListFontsWithInfo(display,
+            "-misc-fixed-*-*-*-*-20-*-*-*-c-*-iso8859-1",
+            256, &nu_fonts, &font_info);
+        int i;
+        for (i = 0; i < nu_fonts; i++) {
+            int w = font_info[i].max_bounds.rbearing - font_info[i].min_bounds.lbearing;
+            int h = font_info[i].ascent + font_info[i].descent;
+//            printf("%s, w = %d, h = %d\n", font_name[i], w, h);
+            if (font_info[i].per_char == NULL && w == 10 && h == 20)
+                break;
+        }
+        X_font_10x20 = NULL;
+        if (i < nu_fonts)
+            X_font_10x20 = XLoadQueryFont(display, font_name[i]);
+        if (X_font_10x20 == NULL)
+            fprintf(stderr, "Could not load 10x20 font.\n");
+        XFreeFontInfo(font_name, font_info, nu_fonts);
+    }
+
+    if (test != TEST_ALL && test != TEST_CORE)
+        if (!check_test_available(test))
+            return 1;
+
+    sleep(2);
 
     int max_size = area_width;
     if (max_size > area_height)
@@ -1360,6 +1465,25 @@ main(int argc, char *argv[])
        if (include_test[i] && check_test_available(i)) {
             if (i == TEST_POINT)
                 do_test(i, 0, 1, 1);
+            else
+            if (i == TEST_TEXT8X13 || i == TEST_TEXT10X20) {
+                /* Size is length in characters. */
+                int font_width, font_height;
+                if (i == TEST_TEXT8X13) {
+                    font_width = 8;
+                    font_height = 13;
+                }
+                else {
+                    font_width = 10;
+                    font_height = 20;
+                }
+                int subtest = 0;
+                for (int size = 8; size * font_width + 8 <= max_size; size = size * 2) {
+                    int lines = size * font_width / font_height;
+                    do_test(i, subtest, size, lines);
+                    subtest++;
+                }
+            }
             else { 
                 int subtest = 0;
                 for (int size = 5; size + 8 <= max_size; size = size * 3 / 2) {
