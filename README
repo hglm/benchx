@@ -31,7 +31,8 @@ Options:
 
 	--noalpha
 
-            Do not attempt to set up support for the XRenderShmPixmapAlpha test.
+            Do not attempt to set up support for the XRenderShmPixmapAlpha and
+            XRenderShmPixmapAlphaToPixmap tests.
 
 <testname> is one of the following:
 
@@ -53,9 +54,9 @@ Options:
         XRenderShmImage                 ShmPutimage to a pixmap and then copy to screen using XRender.
         XRenderShmPixmap                Copy shared memory pixmap to screen using XRender.
         XRenderShmPixmapAlpha           Copy shared memory pixmap with alpha component to screen
-                                        using XRender.
+                                        using XRender with alpha blending.
         XRenderShmPixmapAlphaToPixmap   Off-screen alpha blending. Copy shared memory pixmap with
-					alpha to pixmap using XRender.
+					alpha to pixmap using XRender with alpha blending.
         Core                            Run core tests (the first ten).
 	All				Run all tests.
 
