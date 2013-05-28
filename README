@@ -54,6 +54,8 @@ Options:
         XRenderShmPixmap                Copy shared memory pixmap to screen using XRender.
         XRenderShmPixmapAlpha           Copy shared memory pixmap with alpha component to screen
                                         using XRender.
+        XRenderShmPixmapAlphaToPixmap   Off-screen alpha blending. Copy shared memory pixmap with
+					alpha to pixmap using XRender.
         Core                            Run core tests (the first ten).
 	All				Run all tests.
 

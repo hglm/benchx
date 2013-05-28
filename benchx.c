@@ -347,9 +347,9 @@ static void print_text_graphical(const char *s) {
    nu_lines++;
 }
 
-#define NU_TESTS 18
+#define NU_TESTS 19
 #define NU_CORE_TESTS 10
-#define NU_TEST_NAMES 20
+#define NU_TEST_NAMES 21
 #define TEST_SCREENCOPY 0
 #define TEST_ALIGNEDSCREENCOPY 1
 #define TEST_FILLRECT 2
@@ -368,14 +368,15 @@ static void print_text_graphical(const char *s) {
 #define TEST_XRENDERSHMIMAGE 15
 #define TEST_XRENDERSHMPIXMAP 16
 #define TEST_XRENDERSHMPIXMAPALPHA 17
-#define TEST_CORE 18
-#define TEST_ALL 19
+#define TEST_XRENDERSHMPIXMAPALPHATOPIXMAP 18
+#define TEST_CORE 19
+#define TEST_ALL 20
 
 static const char *test_name[] = {
     "ScreenCopy", "AlignedScreenCopy", "FillRect", "PutImage", "ShmPutImage", "AlignedShmPutImage",
     "ShmPixmapToScreenCopy", "AlignedShmPixmapToScreenCopy", "PixmapCopy", "PixmapFillRect",
     "Point", "Line", "FillCircle", "Text8x13", "Text10x20", "XRenderShmImage", "XRenderShmPixmap",
-    "XRenderShmPixmapAlpha",
+    "XRenderShmPixmapAlpha", "XRenderShmPixmapAlphaToPixmap",
     "Core", "All"
 };
 
@@ -532,6 +533,17 @@ static void test_iteration(int test, int i, int w, int h) {
 		       i & 7, ((i / 8) & 7),
 		       w, h);
                 break;
+            case TEST_XRENDERSHMPIXMAPALPHATOPIXMAP :
+                XRenderComposite(display,
+		       PictOpOver,
+		       shmpixmap_alpha_pict, 
+		       None,
+		       pixmap2_pict, 
+		       0, 0,
+		       0, 0,
+		       i & 7, ((i / 8) & 7),
+		       w, h);
+                break;
             }
 }
 
@@ -577,6 +589,7 @@ void do_test(int test, int subtest, int w, int h) {
     case TEST_XRENDERSHMIMAGE :
     case TEST_XRENDERSHMPIXMAP :
     case TEST_XRENDERSHMPIXMAPALPHA :
+    case TEST_XRENDERSHMPIXMAPALPHATOPIXMAP :
         nu_iterations = 128;
         if (area < 100000)
             nu_iterations = 512;
@@ -648,7 +661,7 @@ void do_test(int test, int subtest, int w, int h) {
                 c = rand();
         }
     }
-    if (test == TEST_XRENDERSHMPIXMAPALPHA) {
+    if (test == TEST_XRENDERSHMPIXMAPALPHA || test == TEST_XRENDERSHMPIXMAPALPHATOPIXMAP) {
         unsigned int c = rand();
         for (int i = 0; i < area_width * area_height * (bpp / 8); i++) {
             *((unsigned char *)shmdata_pixmap_alpha + i) = rand() & 0xFF;
@@ -787,7 +800,8 @@ int check_test_available(int test) {
     if (test == TEST_TEXT10X20) {
         return X_font_10x20 != NULL;
     }
-    if (test == TEST_XRENDERSHMPIXMAPALPHA && !(feature_shm && visual_alpha != NULL)) {
+    if ((test == TEST_XRENDERSHMPIXMAPALPHA || test == TEST_XRENDERSHMPIXMAPALPHATOPIXMAP)
+    && !(feature_shm && visual_alpha != NULL)) {
         if (!feature_shm)
             printf("Cannot run test %s because SHM is not supported.\n", test_name[test]);
         else
@@ -941,7 +955,6 @@ main(int argc, char *argv[])
   screen = DefaultScreen(display);
   root_window = RootWindow(display, screen);
   depth = DefaultDepth(display, screen);
-  fprintf(stderr, "Default depth  %d\n", depth);
   if (depth != 32 && depth != 24 && depth != 16) {
       fprintf(stderr, "Unsupported depth. Depth must be 32, 24 or 16.\n");
       return 1;
