@@ -740,6 +740,13 @@ int check_test_available(int test) {
     if (test == TEST_TEXT10X20) {
         return X_font_10x20 != NULL;
     }
+    if ((test == TEST_XRENDERSHMIMAGE || test == TEST_XRENDERSHMPIXMAP ||
+    test == TEST_XRENDERSHMPIXMAPALPHA || test == TEST_XRENDERSHMPIXMAPALPHATOPIXMAP)
+    && !feature_render) {
+        printf("Cannot run test %s because XRender is not supported.\n",
+            test_name[test]);
+        return 0;
+    }
     if (test == TEST_XRENDERSHMIMAGE && !feature_shm) {
         printf("Cannot run test %s because SHM is not supported.\n",
             test_name[test]);
