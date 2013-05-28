@@ -95,7 +95,7 @@
 
 static Display *display = NULL;
 static Window root_window = None;
-static Visual  *visual = NULL;
+static Visual  *visual = NULL, *visual_alpha = NULL;
 static unsigned int depth;
 static unsigned int bpp;
 static int screen_width, screen_height;
@@ -112,18 +112,19 @@ static GC pixmap2_gc = None;
 
 static XImage *ximage = NULL;
 static XImage *shmximage_ximage = NULL;
-static XImage *shmximage_pixmap = NULL;
+static XImage *shmximage_pixmap = NULL, *shmximage_pixmap_alpha = NULL;
 
 static Pixmap pixmap1 = None;
 static Pixmap pixmap2 = None;
-static Pixmap shmpixmap = None;
+static Pixmap shmpixmap = None, shmpixmap_alpha = None;
 
 static uint8_t *data = NULL;
 static uint8_t *shmdata_ximage = NULL;
-static uint8_t *shmdata_pixmap = NULL;
+static uint8_t *shmdata_pixmap = NULL, *shmdata_pixmap_alpha = NULL;
 
-static Picture pixmap_pict;
+static Picture pixmap2_pict;
 static Picture shmpixmap_pict;
+static Picture shmpixmap_alpha_pict;
 static Picture window_pict;
 
 static int X_pid;
@@ -294,7 +295,7 @@ flush_xevent(Display *d)
     }
     
     XNextEvent(d, &e);
-    printf("event %d\n", e.type);
+//    printf("event %d\n", e.type);
   }
 }
 
@@ -346,9 +347,9 @@ static void print_text_graphical(const char *s) {
    nu_lines++;
 }
 
-#define NU_TESTS 15
+#define NU_TESTS 18
 #define NU_CORE_TESTS 10
-#define NU_TEST_NAMES 17
+#define NU_TEST_NAMES 20
 #define TEST_SCREENCOPY 0
 #define TEST_ALIGNEDSCREENCOPY 1
 #define TEST_FILLRECT 2
@@ -364,13 +365,17 @@ static void print_text_graphical(const char *s) {
 #define TEST_FILLCIRCLE 12
 #define TEST_TEXT8X13 13
 #define TEST_TEXT10X20 14
-#define TEST_CORE 15
-#define TEST_ALL 16
+#define TEST_XRENDERSHMIMAGE 15
+#define TEST_XRENDERSHMPIXMAP 16
+#define TEST_XRENDERSHMPIXMAPALPHA 17
+#define TEST_CORE 18
+#define TEST_ALL 19
 
 static const char *test_name[] = {
     "ScreenCopy", "AlignedScreenCopy", "FillRect", "PutImage", "ShmPutImage", "AlignedShmPutImage",
     "ShmPixmapToScreenCopy", "AlignedShmPixmapToScreenCopy", "PixmapCopy", "PixmapFillRect",
-    "Point", "Line", "FillCircle", "Text8x13", "Text10x20",
+    "Point", "Line", "FillCircle", "Text8x13", "Text10x20", "XRenderShmImage", "XRenderShmPixmap",
+    "XRenderShmPixmapAlpha",
     "Core", "All"
 };
 
@@ -485,6 +490,48 @@ static void test_iteration(int test, int i, int w, int h) {
                     XDrawImageString(display, window, window_gc,
                         i & 7, X_font_10x20->ascent + j * 20, image_string_text, w);
                 break;
+            case TEST_XRENDERSHMIMAGE :
+                /* First copy the image to the pixmap. */
+                XShmPutImage(display,
+                    pixmap2,
+                    pixmap2_gc,
+                    shmximage_ximage,
+                    0, 0,
+                    0, 0,
+                    w, h, False);
+                /* Then copy the pixmap to the screen using XRender. */
+                XRenderComposite(display,
+		       PictOpSrc,
+		       pixmap2_pict, 
+		       None,
+		       window_pict, 
+		       0, 0,
+		       0, 0,
+		       i & 7, ((i / 8) & 7),
+		       w, h);
+                break;
+            case TEST_XRENDERSHMPIXMAP :
+                XRenderComposite(display,
+		       PictOpSrc,
+		       shmpixmap_pict, 
+		       None,
+		       window_pict, 
+		       0, 0,
+		       0, 0,
+		       i & 7, ((i / 8) & 7),
+		       w, h);
+                break;
+            case TEST_XRENDERSHMPIXMAPALPHA :
+                XRenderComposite(display,
+		       PictOpOver,
+		       shmpixmap_alpha_pict, 
+		       None,
+		       window_pict, 
+		       0, 0,
+		       0, 0,
+		       i & 7, ((i / 8) & 7),
+		       w, h);
+                break;
             }
 }
 
@@ -527,6 +574,9 @@ void do_test(int test, int subtest, int w, int h) {
     case TEST_ALIGNEDSHMPUTIMAGE :
     case TEST_SHMPIXMAPTOSCREENCOPY :
     case TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY :
+    case TEST_XRENDERSHMIMAGE :
+    case TEST_XRENDERSHMPIXMAP :
+    case TEST_XRENDERSHMPIXMAPALPHA :
         nu_iterations = 128;
         if (area < 100000)
             nu_iterations = 512;
@@ -578,7 +628,8 @@ void do_test(int test, int subtest, int w, int h) {
 		0, 0, 
 		0, 0, 
 		area_width, area_height);
-    if (test == TEST_SHMPUTIMAGE || test == TEST_ALIGNEDSHMPUTIMAGE) {
+    if (test == TEST_SHMPUTIMAGE || test == TEST_ALIGNEDSHMPUTIMAGE ||
+    test == TEST_XRENDERSHMIMAGE) {
         unsigned int c = rand();
         for (int i = 0; i < area_width * area_height * (bpp / 8); i++) {
             *((unsigned char *)shmdata_ximage + i) = c & 0xFF;
@@ -588,10 +639,19 @@ void do_test(int test, int subtest, int w, int h) {
         }
     }
     if (test == TEST_SHMPIXMAPTOSCREENCOPY || test == TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY
-    || test == TEST_PIXMAPCOPY) {
+    || test == TEST_PIXMAPCOPY || test == TEST_XRENDERSHMPIXMAP) {
         unsigned int c = rand();
         for (int i = 0; i < area_width * area_height * (bpp / 8); i++) {
             *((unsigned char *)shmdata_pixmap + i) = rand() & 0xFF;
+            c += 0x7E7E7E7E;
+            if ((i & 255) == 255)
+                c = rand();
+        }
+    }
+    if (test == TEST_XRENDERSHMPIXMAPALPHA) {
+        unsigned int c = rand();
+        for (int i = 0; i < area_width * area_height * (bpp / 8); i++) {
+            *((unsigned char *)shmdata_pixmap_alpha + i) = rand() & 0xFF;
             c += 0x7E7E7E7E;
             if ((i & 255) == 255)
                 c = rand();
@@ -727,6 +787,14 @@ int check_test_available(int test) {
     if (test == TEST_TEXT10X20) {
         return X_font_10x20 != NULL;
     }
+    if (test == TEST_XRENDERSHMPIXMAPALPHA && !(feature_shm && visual_alpha != NULL)) {
+        if (!feature_shm)
+            printf("Cannot run test %s because SHM is not supported.\n", test_name[test]);
+        else
+            printf("Cannot run test %s because there is no 32bpp visual with alpha.\n",
+                test_name[test]);
+        return 0;
+    }
     return 1;
 }
 
@@ -743,13 +811,13 @@ main(int argc, char *argv[])
   XVisualInfo xvinfo_template;
 
   XRenderPictFormat pf;
-  XRenderPictFormat *pict_format = NULL;
-  XRenderPictFormat *pict_visualformat = NULL;
+  XRenderPictFormat *pict_format = NULL, *pict_format_alpha = NULL;
+  XRenderPictFormat *pict_visualformat = NULL, *pict_visualformat_alpha = NULL;
     
   XRenderPictureAttributes pict_attr;
 
-  XShmSegmentInfo shminfo_ximage;
-  XShmSegmentInfo shminfo_pixmap;
+  XShmSegmentInfo shminfo_ximage, shminfo_ximage_alpha;
+  XShmSegmentInfo shminfo_pixmap, shminfo_pixmap_alpha;
   
   int major;
   int minor;
@@ -758,6 +826,7 @@ main(int argc, char *argv[])
   int sched;
   struct sched_param param;
   pid_t pid;
+  bool option_noalpha = false;
 
     int argi = 1;
     if (argc == 1) {
@@ -770,6 +839,8 @@ main(int argc, char *argv[])
             "        Specifies the size of the area to be drawn into in pixels (n x n).\n"
             "        A larger size will allow subtests with a larger area to be performed.\n"
             "        The default is %d.\n"
+            "    --noalpha\n"
+            "        Do not attempt to set up support for the XRenderShmPixmapAlpha test.\n"
             "Tests:\n", DEFAULT_TEST_DURATION, DEFAULT_AREA_WIDTH);
         for (int i = 0; i < NU_TEST_NAMES; i++)
             printf("    %s\n", test_name[i]);
@@ -803,6 +874,11 @@ main(int argc, char *argv[])
             area_width = size;
             area_height = size;
             argi += 2;
+            continue;
+        }
+        if (strcasecmp(argv[argi], "--noalpha") == 0) {
+            option_noalpha = true;
+            argi++;
             continue;
         }
         break;
@@ -842,8 +918,8 @@ main(int argc, char *argv[])
   } else {
     fprintf(stderr, "Render: %d.%d\n", major, minor);
     feature_render = True;
-    fprintf(stderr, "Render extension is disabled in benchx.\n");
-    feature_render = False;
+//    fprintf(stderr, "Render extension is disabled in benchx.\n");
+//    feature_render = False;
   }
 
   if (!XShmQueryVersion(display,
@@ -865,7 +941,7 @@ main(int argc, char *argv[])
   screen = DefaultScreen(display);
   root_window = RootWindow(display, screen);
   depth = DefaultDepth(display, screen);
-  fprintf(stderr, "Default depth = %d.\n", depth);
+  fprintf(stderr, "Default depth  %d\n", depth);
   if (depth != 32 && depth != 24 && depth != 16) {
       fprintf(stderr, "Unsupported depth. Depth must be 32, 24 or 16.\n");
       return 1;
@@ -890,7 +966,7 @@ main(int argc, char *argv[])
     if (bpp == 16)
         pict_format = NULL;
     else
-        pict_format = XRenderFindStandardFormat(display, PictStandardARGB32);
+        pict_format = XRenderFindStandardFormat(display, PictStandardRGB24);
     if (pict_format == NULL) {
       if (bpp == 16) {
           fprintf(stderr, "Can't find standard format for RGB16\n");
@@ -915,18 +991,18 @@ main(int argc, char *argv[])
 				      0);
       }
       else {
-          fprintf(stderr, "Can't find standard format for ARGB32\n");
+          fprintf(stderr, "Can't find standard format for RGB24\n");
   
-          /* lookup an other ARGB picture format */
+          /* lookup an other RGB24 picture format */
           pf.type = PictTypeDirect;
-          pf.depth = 32;
+          pf.depth = 24;
 
-          pf.direct.alphaMask = 0xff;    
+//          pf.direct.alphaMask = 0xff;    
           pf.direct.redMask = 0xff;
           pf.direct.greenMask = 0xff;
           pf.direct.blueMask = 0xff;
       
-          pf.direct.alpha = 24;    
+//          pf.direct.alpha = 24;    
           pf.direct.red = 16;
           pf.direct.green = 8;
           pf.direct.blue = 0;
@@ -936,8 +1012,8 @@ main(int argc, char *argv[])
 				       PictFormatDepth |
 				       PictFormatRedMask | PictFormatRed |
 				       PictFormatGreenMask | PictFormatGreen |
-				       PictFormatBlueMask | PictFormatBlue   |
-				       PictFormatAlphaMask | PictFormatAlpha),
+				       PictFormatBlueMask | PictFormatBlue /* | */
+				       /* PictFormatAlphaMask | PictFormatAlpha */),
 				      &pf,
 				      0);
       }
@@ -952,7 +1028,7 @@ main(int argc, char *argv[])
         /* try to lookup a RGB visual */
         count = 0;
         xvinfo_template.screen = screen;
-        xvinfo_template.depth = 32;
+        xvinfo_template.depth = 24;
         xvinfo_template.bits_per_rgb = 8;
     
         xvinfos = XGetVisualInfo(display, 
@@ -981,7 +1057,77 @@ main(int argc, char *argv[])
 	}
       }
     }
+
+    /* Look up a picture and visual format for 32bpp with alpha. */
+    if (bpp == 32 && option_noalpha)
+        visual_alpha = NULL;
+    else
+    if (bpp == 32) {
+        pict_format_alpha = XRenderFindStandardFormat(display, PictStandardARGB32);
+        if (pict_format_alpha == NULL) {
+          fprintf(stderr, "Can't find standard format for ARGB32\n");
+  
+          /* lookup an other ARGB32 picture format */
+          pf.type = PictTypeDirect;
+          pf.depth = 32;
+
+          pf.direct.alphaMask = 0xff;    
+          pf.direct.redMask = 0xff;
+          pf.direct.greenMask = 0xff;
+          pf.direct.blueMask = 0xff;
+      
+          pf.direct.alpha = 24;    
+          pf.direct.red = 16;
+          pf.direct.green = 8;
+          pf.direct.blue = 0;
+      
+          pict_format_alpha = XRenderFindFormat(display,
+				      (PictFormatType |
+				       PictFormatDepth |
+				       PictFormatRedMask | PictFormatRed |
+				       PictFormatGreenMask | PictFormatGreen |
+				       PictFormatBlueMask | PictFormatBlue |
+				       PictFormatAlphaMask | PictFormatAlpha),
+				      &pf,
+				      0);
+        }
+
+      if (pict_format_alpha == NULL) {
+	fprintf(stderr, "Can't find XRender picture format for 32bpp with alpha.\n");
+	visual_alpha = NULL;
+      }
+      else {
+    
+        /* Try to lookup a RGB visual with depth 32. */
+        count = 0;
+        xvinfo_template.screen = screen;
+        xvinfo_template.depth = 32;
+        xvinfo_template.bits_per_rgb = 8;
+    
+        xvinfos = XGetVisualInfo(display, 
+			     (VisualScreenMask | 
+			      VisualDepthMask | 
+			      VisualBitsPerRGBMask),
+			     &xvinfo_template,
+			     &count);
+
+        if (xvinfos == NULL) {
+            fprintf(stderr, "No visual matching criteria\n");
+        } else {
+          for (i = 0; i < count; i++) {
+	      pict_visualformat_alpha = XRenderFindVisualFormat(display, xvinfos[i].visual);
+              if (pict_visualformat_alpha != NULL &&
+	      pict_visualformat_alpha->id == pict_format_alpha->id) {
+	          visual_alpha = xvinfos[i].visual;
+                  break;
+              }
+          }
+        }
+      } /* pict_format_alpha != NULL */
+    } /* bpp == 32 */
+
   } else {
+
     /* No feature_render */
     if (bpp == 32) {
         /* try to lookup a RGB visual */
@@ -1027,6 +1173,9 @@ main(int argc, char *argv[])
   if (visual == NULL) {
     printf("No suitable visual, fatal, leaving ...\n");
     return 1;
+  }
+  if (visual_alpha == NULL && !option_noalpha) {
+    fprintf(stderr, "Couldn't find 32bpp visual with alpha.\n");
   }
 
     /* Create a window if necessary. */
@@ -1190,6 +1339,53 @@ main(int argc, char *argv[])
     XShmAttach(display, &shminfo_pixmap);
     
     shmdata_pixmap = shmximage_pixmap->data;
+
+    /* Now do the same for the shared memory pixmap with alpha. */
+    if (bpp == 32 && feature_render && visual_alpha != NULL) {
+        /* for the XShmPixmap */
+        shminfo_pixmap_alpha.shmid = -1;
+        shminfo_pixmap_alpha.shmaddr = (char *) -1;
+        shminfo_pixmap_alpha.readOnly = False;
+    
+        shmximage_pixmap_alpha = XShmCreateImage(display,
+				       visual_alpha,
+				       32,
+				       ZPixmap,
+				       NULL,
+				       &shminfo_pixmap_alpha,
+				       area_width,
+				       area_height);
+
+        if (shmximage_pixmap_alpha == NULL) {
+          fprintf(stderr, "Can't create XImage for SHM Pixmap wth alpha\n");
+          return 1;
+        }
+    
+        shminfo_pixmap_alpha.shmid =
+          shmget(IPC_PRIVATE,
+	     shmximage_pixmap_alpha->bytes_per_line * shmximage_pixmap_alpha->height,
+	     IPC_CREAT | 0600);
+    
+        if (shminfo_pixmap.shmid == -1) {
+          perror("shmget()");
+          return 1;
+        }
+    
+        shminfo_pixmap_alpha.shmaddr = shmximage_pixmap_alpha->data =
+            shmat(shminfo_pixmap_alpha.shmid, NULL, 0);
+    
+        shmctl(shminfo_pixmap_alpha.shmid, IPC_RMID, 0);
+    
+        if (shminfo_pixmap_alpha.shmaddr == (void *) -1 ||
+	shminfo_pixmap_alpha.shmaddr == NULL) {
+            perror("shmat()");
+            return 1;
+        }
+    
+        XShmAttach(display, &shminfo_pixmap_alpha);
+    
+        shmdata_pixmap_alpha = shmximage_pixmap_alpha->data;
+    }
   }
 
   /* create the graphic context */
@@ -1241,14 +1437,22 @@ main(int argc, char *argv[])
 				 area_width,
 				 area_height,
 				 depth);
+    if (bpp == 32 && feature_render && visual_alpha != NULL)
+        shmpixmap_alpha = XShmCreatePixmap(display,
+				 window,
+				 shminfo_pixmap_alpha.shmaddr,
+				 &shminfo_pixmap_alpha,
+				 area_width,
+				 area_height,
+				 32);
   }
 
   if (feature_render) {
     /* create XRender Picture objects */
     pict_attr.component_alpha = False;
     
-    pixmap_pict = XRenderCreatePicture(display, 
-				       pixmap1,
+    pixmap2_pict = XRenderCreatePicture(display, 
+				       pixmap2,
 				       pict_format,
 				       CPComponentAlpha,
 				       &pict_attr);
@@ -1265,6 +1469,14 @@ main(int argc, char *argv[])
 					    pict_format,
 					    CPComponentAlpha,
 					    &pict_attr);
+      if (bpp == 32 && visual_alpha != NULL) {
+          pict_attr.component_alpha = True;
+          shmpixmap_alpha_pict = XRenderCreatePicture(display, 
+					    shmpixmap_alpha,
+					    pict_format_alpha,
+					    CPComponentAlpha,
+					    &pict_attr);
+      }
     }
   }
 
@@ -1279,7 +1491,7 @@ main(int argc, char *argv[])
         /* check X event */
         XNextEvent(display, &e);
     
-        printf("event %d\n", e.type);
+//        printf("event %d\n", e.type);
 
         if (e.type == MapNotify) {
            break;
@@ -1400,9 +1612,6 @@ main(int argc, char *argv[])
     int nu_fonts;
     char **font_name;
     XFontStruct *font_info;
-    if (include_test[TEST_TEXT8X13] || include_test[TEST_TEXT10X20]) {
-    }
-
     if (include_test[TEST_TEXT8X13]) {
         font_name = XListFontsWithInfo(display,
             "-misc-fixed-*-*-*-*-13-*-*-*-c-*-iso8859-1",

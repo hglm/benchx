@@ -29,6 +29,10 @@ Options:
             A larger size will allow subtests with a larger area to be performed.
             The default is 600.
 
+	--noalpha
+
+            Do not attempt to set up support for the XRenderShmPixmapAlpha test.
+
 <testname> is one of the following:
 
 	ScreenCopy			Screen to screen blits (using XCopyArea).
@@ -46,6 +50,10 @@ Options:
         FillCircle                      Filled circle using XFillArc.
         Text8x13			Draw text with 8x13 fixed font.
         Text10x20                       Draw text with 10x20 fixed font.
+        XRenderShmImage                 ShmPutimage to a pixmap and then copy to screen using Xrender.
+        XRenderShmPixmap                Copy shared memory pixmap to screen using XRender.
+        XRenderShmPixmapAlpha           Copy shared memory pixmap with alpha component to screen
+                                        using XRender.
         Core                            Run core tests (the first ten).
 	All				Run all tests.
 
