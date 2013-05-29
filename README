@@ -63,7 +63,7 @@ Options:
                                         using XRender with alpha blending.
         XRenderShmPixmapAlphaToPixmap   Off-screen alpha blending. Copy shared memory pixmap with
 					alpha to pixmap using XRender with alpha blending.
-        Core                            Run core tests (the first ten).
+        Core                            Run core tests (the first 12).
 	All				Run all tests.
 
 Run benchx without arguments for the full list.
