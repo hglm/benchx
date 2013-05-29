@@ -108,7 +108,7 @@ static int feature_shm_pixmap = False;
 static int feature_shm = False;
 
 static XGCValues gcvalues;
-static GC pixmap2_gc = None, pixmap2_alpha_gc = None;
+static GC pixmap1_gc = None, pixmap2_gc = None, pixmap2_alpha_gc = None;
 
 static XImage *ximage = NULL;
 static XImage *shmximage_ximage = NULL, *shmximage_ximage_alpha;
@@ -520,7 +520,7 @@ static void test_iteration(int test, int i, int w, int h) {
 }
 
 void do_test(int test, int subtest, int w, int h) {
-    int nu_iterations = 1000;
+    int nu_iterations = 1024;
     int operation_count;
     int area = w * h;
     /*
@@ -569,7 +569,8 @@ void do_test(int test, int subtest, int w, int h) {
     case TEST_SHMPUTIMAGE:
     case TEST_ALIGNEDSHMPUTIMAGE:
     case TEST_SHMPIXMAPTOSCREENCOPY:
-    case TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY: 
+    case TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY:
+    case TEST_PIXMAPCOPY:
     case TEST_XRENDERSHMIMAGE:
     case TEST_XRENDERSHMIMAGEALPHA:
     case TEST_XRENDERSHMPIXMAP:
@@ -641,7 +642,7 @@ void do_test(int test, int subtest, int w, int h) {
         }
     }
     if (test == TEST_SHMPIXMAPTOSCREENCOPY
-    || test == TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY || test == TEST_PIXMAPCOPY
+    || test == TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY
     || test == TEST_XRENDERSHMPIXMAP) {
         unsigned int c = rand();
         for (int i = 0; i < area_width * area_height * (bpp / 8); i++) {
@@ -662,6 +663,11 @@ void do_test(int test, int subtest, int w, int h) {
         }
     }
     XGCValues values;
+    if (test == TEST_PIXMAPCOPY) {
+        values.foreground = rand() & 0xFFFFFF;
+        XChangeGC(display, pixmap1_gc, GCForeground, &values);
+        XFillRectangle(display, pixmap1, pixmap1_gc, 0, 0, area_width, area_height);
+    }
     /* Draw a dot to indicate which test is being run. */
     values.foreground = 0xFFFFFFFF;
     XChangeGC(display, window_gc, GCForeground, &values);
@@ -1208,7 +1214,7 @@ find_visual:
     }
 
     if (visual == NULL) {
-        printf("Couldn't find a suitable visual.\n");
+        printf("Couldn't find a suitable visual. Try using the --noxrender option.\n");
         return 1;
     }
     if (bpp == 32 && visual_alpha == NULL && !option_noalpha) {
@@ -1461,6 +1467,11 @@ find_visual:
     else
         gcvalues.foreground = 0x0000FFFF;
     gcvalues.background = 0;
+    pixmap1_gc = XCreateGC(display, pixmap1,
+        (GCBackground |
+            GCForeground |
+            GCFunction |
+            GCPlaneMask | GCClipMask | GCGraphicsExposures), &gcvalues);
     pixmap2_gc = XCreateGC(display, pixmap2,
         (GCBackground |
             GCForeground |
