@@ -31,8 +31,8 @@ Options:
 
 	--noalpha
 
-            Do not attempt to set up support for the XRenderShmPixmapAlpha and
-            XRenderShmPixmapAlphaToPixmap tests.
+            Do not attempt to set up support for the XRenderShmImageAlpha,
+            XRenderShmPixmapAlpha, and XRenderShmPixmapAlphaToPixmap tests.
 
 <testname> is one of the following:
 
@@ -52,6 +52,8 @@ Options:
         Text8x13			Draw text with 8x13 fixed font.
         Text10x20                       Draw text with 10x20 fixed font.
         XRenderShmImage                 ShmPutimage to a pixmap and then copy to screen using XRender.
+        XRenderShmImageAlpha            ShmPutimage to a pixmap with alpha component and then copy to
+                                        screen using XRender with alpha blending.
         XRenderShmPixmap                Copy shared memory pixmap to screen using XRender.
         XRenderShmPixmapAlpha           Copy shared memory pixmap with alpha component to screen
                                         using XRender with alpha blending.

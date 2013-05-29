@@ -37,12 +37,13 @@ typedef struct {
     int cpu[MAX_RESULTS];
 } BenchResults;
 
-#define NU_TEST_TYPES 19
+#define NU_TEST_TYPES 20
 
 static const char *test_name[NU_TEST_TYPES] = {
     "ScreenCopy", "AlignedScreenCopy", "FillRect", "PutImage", "ShmPutImage", "AlignedShmPutImage",
     "ShmPixmapToScreenCopy", "AlignedShmPixmapToScreenCopy", "PixmapCopy", "PixmapFillRect",
-    "Point", "Line", "FillCircle", "Text8x13", "Text10x20", "XRenderShmImage", "XRenderShmPixmap",
+    "Point", "Line", "FillCircle", "Text8x13", "Text10x20", "XRenderShmImage",
+    "XRenderShmImageAlpha", "XRenderShmPixmap",
     "XRenderShmPixmapAlpha", "XRenderShmPixmapAlphaToPixmap"
 };
 

@@ -107,21 +107,21 @@ static int feature_shm_pixmap = False;
 static int feature_shm = False;
 
 static XGCValues gcvalues;
-static GC pixmap2_gc = None;
+static GC pixmap2_gc = None, pixmap2_alpha_gc = None;
 
 static XImage *ximage = NULL;
-static XImage *shmximage_ximage = NULL;
+static XImage *shmximage_ximage = NULL, *shmximage_ximage_alpha;
 static XImage *shmximage_pixmap = NULL, *shmximage_pixmap_alpha = NULL;
 
 static Pixmap pixmap1 = None;
-static Pixmap pixmap2 = None;
+static Pixmap pixmap2 = None, pixmap2_alpha = None;
 static Pixmap shmpixmap = None, shmpixmap_alpha = None;
 
 static uint8_t *data = NULL;
-static uint8_t *shmdata_ximage = NULL;
+static uint8_t *shmdata_ximage = NULL, *shmdata_ximage_alpha = NULL;
 static uint8_t *shmdata_pixmap = NULL, *shmdata_pixmap_alpha = NULL;
 
-static Picture pixmap2_pict;
+static Picture pixmap2_pict, pixmap2_alpha_pict;
 static Picture shmpixmap_pict;
 static Picture shmpixmap_alpha_pict;
 static Picture window_pict;
@@ -342,9 +342,9 @@ static void print_text_graphical(const char *s) {
     nu_lines++;
 }
 
-#define NU_TESTS 19
+#define NU_TESTS 20
 #define NU_CORE_TESTS 10
-#define NU_TEST_NAMES 21
+#define NU_TEST_NAMES 22
 #define TEST_SCREENCOPY 0
 #define TEST_ALIGNEDSCREENCOPY 1
 #define TEST_FILLRECT 2
@@ -361,19 +361,18 @@ static void print_text_graphical(const char *s) {
 #define TEST_TEXT8X13 13
 #define TEST_TEXT10X20 14
 #define TEST_XRENDERSHMIMAGE 15
-#define TEST_XRENDERSHMPIXMAP 16
-#define TEST_XRENDERSHMPIXMAPALPHA 17
-#define TEST_XRENDERSHMPIXMAPALPHATOPIXMAP 18
-#define TEST_CORE 19
-#define TEST_ALL 20
+#define TEST_XRENDERSHMIMAGEALPHA 16
+#define TEST_XRENDERSHMPIXMAP 17
+#define TEST_XRENDERSHMPIXMAPALPHA 18
+#define TEST_XRENDERSHMPIXMAPALPHATOPIXMAP 19
+#define TEST_CORE 20
+#define TEST_ALL 21
 
 static const char *test_name[] = {
     "ScreenCopy", "AlignedScreenCopy", "FillRect", "PutImage", "ShmPutImage",
-        "AlignedShmPutImage",
-    "ShmPixmapToScreenCopy", "AlignedShmPixmapToScreenCopy", "PixmapCopy",
-        "PixmapFillRect",
-    "Point", "Line", "FillCircle", "Text8x13", "Text10x20", "XRenderShmImage",
-        "XRenderShmPixmap",
+    "AlignedShmPutImage", "ShmPixmapToScreenCopy", "AlignedShmPixmapToScreenCopy",
+    "PixmapCopy", "PixmapFillRect", "Point", "Line", "FillCircle", "Text8x13",
+    "Text10x20", "XRenderShmImage", "XRenderShmImageAlpha", "XRenderShmPixmap",
     "XRenderShmPixmapAlpha", "XRenderShmPixmapAlphaToPixmap",
     "Core", "All"
 };
@@ -467,6 +466,17 @@ static void test_iteration(int test, int i, int w, int h) {
             pixmap2_pict,
             None, window_pict, 0, 0, 0, 0, i & 7, ((i / 8) & 7), w, h);
         break;
+    case TEST_XRENDERSHMIMAGEALPHA :
+        /* First copy the image to the pixmap. */
+        XShmPutImage(display,
+            pixmap2_alpha, pixmap2_alpha_gc, shmximage_ximage_alpha, 0, 0, 0, 0,
+            w, h, False);
+        /* Then copy the pixmap to the screen using XRender. */
+        XRenderComposite(display,
+            PictOpOver,
+            pixmap2_alpha_pict,
+            None, window_pict, 0, 0, 0, 0, i & 7, ((i / 8) & 7), w, h);
+        break;
     case TEST_XRENDERSHMPIXMAP:
         XRenderComposite(display,
             PictOpSrc,
@@ -526,8 +536,9 @@ void do_test(int test, int subtest, int w, int h) {
     case TEST_SHMPUTIMAGE:
     case TEST_ALIGNEDSHMPUTIMAGE:
     case TEST_SHMPIXMAPTOSCREENCOPY:
-    case TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY:
+    case TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY: 
     case TEST_XRENDERSHMIMAGE:
+    case TEST_XRENDERSHMIMAGEALPHA:
     case TEST_XRENDERSHMPIXMAP:
     case TEST_XRENDERSHMPIXMAPALPHA:
     case TEST_XRENDERSHMPIXMAPALPHATOPIXMAP:
@@ -582,6 +593,15 @@ void do_test(int test, int subtest, int w, int h) {
         unsigned int c = rand();
         for (int i = 0; i < area_width * area_height * (bpp / 8); i++) {
             *((unsigned char *)shmdata_ximage + i) = c & 0xFF;
+            c += 0x7E7E7E7E;
+            if ((i & 255) == 255)
+                c = rand();
+        }
+    }
+    if (test == TEST_XRENDERSHMIMAGEALPHA) {
+        unsigned int c = rand();
+        for (int i = 0; i < area_width * area_height * (bpp / 8); i++) {
+            *((unsigned char *)shmdata_ximage_alpha + i) = c & 0xFF;
             c += 0x7E7E7E7E;
             if ((i & 255) == 255)
                 c = rand();
@@ -740,32 +760,31 @@ int check_test_available(int test) {
     if (test == TEST_TEXT10X20) {
         return X_font_10x20 != NULL;
     }
-    if ((test == TEST_XRENDERSHMIMAGE || test == TEST_XRENDERSHMPIXMAP ||
+    if ((test == TEST_XRENDERSHMIMAGE || test == TEST_XRENDERSHMIMAGEALPHA ||
+    test == TEST_XRENDERSHMPIXMAP ||
     test == TEST_XRENDERSHMPIXMAPALPHA || test == TEST_XRENDERSHMPIXMAPALPHATOPIXMAP)
     && !feature_render) {
         printf("Cannot run test %s because XRender is not supported.\n",
             test_name[test]);
         return 0;
     }
-    if (test == TEST_XRENDERSHMIMAGE && !feature_shm) {
+    if ((test == TEST_XRENDERSHMIMAGE|| test == TEST_XRENDERSHMIMAGEALPHA)
+    && !feature_shm) {
         printf("Cannot run test %s because SHM is not supported.\n",
             test_name[test]);
         return 0;
     }
-    if (test == TEST_XRENDERSHMPIXMAP && !feature_shm_pixmap) {
+    if ((test == TEST_XRENDERSHMPIXMAP || test == TEST_XRENDERSHMPIXMAPALPHA
+    || test == TEST_XRENDERSHMPIXMAPALPHATOPIXMAP) && !feature_shm_pixmap) {
         printf("Cannot run test %s because SHM pixmap is not supported.\n",
             test_name[test]);
         return 0;
     }
-    if ((test == TEST_XRENDERSHMPIXMAPALPHA || test == TEST_XRENDERSHMPIXMAPALPHATOPIXMAP)
-    && !(feature_shm_pixmap && visual_alpha != NULL)) {
-        if (!feature_shm_pixmap)
-            printf("Cannot run test %s because SHM pixmap is not supported.\n",
-                test_name[test]);
-        else
-            printf
-                ("Cannot run test %s because there is no 32bpp visual with alpha.\n",
-                test_name[test]);
+    if ((test == TEST_XRENDERSHMPIXMAPALPHA || test == TEST_XRENDERSHMPIXMAPALPHATOPIXMAP
+    || test == TEST_XRENDERSHMIMAGEALPHA)
+    && visual_alpha == NULL) {
+        printf("Cannot run test %s because there is no 32bpp visual with alpha.\n",
+            test_name[test]);
         return 0;
     }
     return 1;
@@ -812,9 +831,11 @@ int main(int argc, char *argv[]) {
             "    --size <pixels>\n"
             "        Specifies the size of the area to be drawn into in pixels (n x n).\n"
             "        A larger size will allow subtests with a larger area to be performed.\n"
-            "        The default is %d.\n" "    --noalpha\n"
-            "        Do not attempt to set up support for the XRenderShmPixmapAlpha test and\n"
-            "        XRenderShmPixmapAlphaToPixmap tests.\n" "Tests:\n",
+            "        The default is %d.\n"
+            "    --noalpha\n"
+            "        Do not attempt to set up support for the XRenderShmImageAlpha,\n"
+            "        XRenderShmPixmapAlpha and XRenderShmPixmapAlphaToPixmap tests.\n"
+            "Tests:\n",
             DEFAULT_TEST_DURATION, DEFAULT_AREA_WIDTH);
         for (int i = 0; i < NU_TEST_NAMES; i++)
             printf("    %s\n", test_name[i]);
@@ -1082,8 +1103,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }                   /* pict_format_alpha != NULL */
-        }
-        /* bpp == 32 */
+        } /* bpp == 32 */
     } else {
 
         /* No feature_render */
@@ -1222,6 +1242,49 @@ int main(int argc, char *argv[]) {
         shmdata_ximage = shmximage_ximage->data;
 
         XShmAttach(display, &shminfo_ximage);
+
+        /* For the XRenderShmImageAlpha test, create a SHM image of depth 32. */
+        if (bpp == 32 && feature_render && visual_alpha != NULL) {
+            shminfo_ximage_alpha.shmid = -1;
+            shminfo_ximage_alpha.shmaddr = (char *)-1;
+            shminfo_ximage_alpha.readOnly = False;
+
+            shmximage_ximage_alpha = XShmCreateImage(display,
+                visual_alpha,
+                32,
+                ZPixmap, NULL, &shminfo_ximage_alpha, area_width, area_height);
+
+            if (shmximage_ximage_alpha == NULL) {
+                fprintf(stderr,
+                    "Can't create SHM XImage wth alpha\n");
+                return 1;
+            }
+
+            shminfo_ximage_alpha.shmid =
+                shmget(IPC_PRIVATE,
+                    shmximage_ximage_alpha->bytes_per_line * shmximage_ximage_alpha->height,
+                    IPC_CREAT | 0600);
+
+            if (shminfo_ximage_alpha.shmid == -1) {
+                perror("shmget()");
+                return 1;
+            }
+
+            shminfo_ximage_alpha.shmaddr = shmximage_ximage_alpha->data =
+                shmat(shminfo_ximage_alpha.shmid, NULL, 0);
+
+            shmctl(shminfo_ximage_alpha.shmid, IPC_RMID, 0);
+
+        if (shminfo_ximage_alpha.shmaddr == (void *)-1 ||
+            shminfo_ximage_alpha.shmaddr == NULL) {
+            perror("shmat()");
+            return 1;
+        }
+
+        shmdata_ximage_alpha = shmximage_ximage_alpha->data;
+
+        XShmAttach(display, &shminfo_ximage_alpha);
+        }
     }
 
     /*
@@ -1329,6 +1392,8 @@ int main(int argc, char *argv[]) {
     /* create pixmaps */
     pixmap1 = XCreatePixmap(display, window, area_width, area_height, depth);
     pixmap2 = XCreatePixmap(display, window, area_width, area_height, depth);
+    if (bpp == 32 && feature_shm && feature_render && visual_alpha != NULL)
+        pixmap2_alpha = XCreatePixmap(display, window, area_width, area_height, 32);
     if (bpp == 32)
         gcvalues.foreground = 0x00FFFFFF;
     else
@@ -1336,6 +1401,12 @@ int main(int argc, char *argv[]) {
     gcvalues.background = 0;
     pixmap2_gc = XCreateGC(display, pixmap2,
         (GCBackground |
+            GCForeground |
+            GCFunction |
+            GCPlaneMask | GCClipMask | GCGraphicsExposures), &gcvalues);
+    if (bpp == 32 && feature_shm && feature_render && visual_alpha != NULL)
+        pixmap2_alpha_gc = XCreateGC(display, pixmap2_alpha,
+            (GCBackground |
             GCForeground |
             GCFunction |
             GCPlaneMask | GCClipMask | GCGraphicsExposures), &gcvalues);
@@ -1371,6 +1442,11 @@ int main(int argc, char *argv[]) {
                     shmpixmap_alpha,
                     pict_format_alpha, CPComponentAlpha, &pict_attr);
             }
+        }
+        if (bpp == 32 && feature_shm && visual_alpha != NULL) {
+            pict_attr.component_alpha = True;
+            pixmap2_alpha_pict = XRenderCreatePicture(display,
+                pixmap2_alpha, pict_format_alpha, CPComponentAlpha, &pict_attr);
         }
     }
 
