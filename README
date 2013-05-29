@@ -35,6 +35,11 @@ Options:
             Do not attempt to set up support for the XRenderShmImageAlpha,
             XRenderShmPixmapAlpha, and XRenderShmPixmapAlphaToPixmap tests.
 
+	--noxrender
+
+            Do not attempt to set up support for XRender related tests. This implies
+            --noalpha. If no proper visual is detected at 32bpp, this option may help.
+
 <testname> is one of the following:
 
 	ScreenCopy			Screen to screen blits (using XCopyArea).

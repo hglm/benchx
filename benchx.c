@@ -851,6 +851,7 @@ int main(int argc, char *argv[]) {
     struct sched_param param;
     pid_t pid;
     bool option_noalpha = false;
+    bool option_noxrender = false;
 
     int argi = 1;
     if (argc == 1) {
@@ -868,6 +869,9 @@ int main(int argc, char *argv[]) {
             "    --noalpha\n"
             "        Do not attempt to set up support for the XRenderShmImageAlpha,\n"
             "        XRenderShmPixmapAlpha and XRenderShmPixmapAlphaToPixmap tests.\n"
+            "    --noxrender\n"
+            "        Do not attempt to set up support for XRender related tests. This\n"
+            "        implies --noalpha.\n"
             "Tests:\n",
             DEFAULT_TEST_DURATION, DEFAULT_AREA_WIDTH);
         for (int i = 0; i < NU_TEST_NAMES; i++)
@@ -905,6 +909,12 @@ int main(int argc, char *argv[]) {
             continue;
         }
         if (strcasecmp(argv[argi], "--noalpha") == 0) {
+            option_noalpha = true;
+            argi++;
+            continue;
+        }
+        if (strcasecmp(argv[argi], "--noxrender") == 0) {
+            option_noxrender = true;
             option_noalpha = true;
             argi++;
             continue;
@@ -984,6 +994,11 @@ int main(int argc, char *argv[]) {
             "Drawing area too large (area size %d x %d, screen size %d x %d).\n",
             area_width, area_height, screen_width, screen_height);
         return 1;
+    }
+
+    if (feature_render && option_noxrender) {
+        fprintf(stderr, "XRender feature disabled with option --noxrender.\n");
+        feature_render = False;
     }
 
     if (feature_render) {
