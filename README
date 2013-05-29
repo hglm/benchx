@@ -6,7 +6,8 @@ server. It supports 16bpp and 32bpp.
 *** Installation ***
 
 Try "sudo make install". You may need to install various X development libraries to succesfully
-compile.
+compile. In Debian Wheezy, this includes the packages libx11-dev, libxrender-dev and
+libxcomposite-dev.
 
 *** Usage ***
 

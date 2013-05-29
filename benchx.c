@@ -1172,7 +1172,7 @@ int main(int argc, char *argv[]) {
         printf("No suitable visual, fatal, leaving ...\n");
         return 1;
     }
-    if (visual_alpha == NULL && !option_noalpha) {
+    if (bpp == 32 && visual_alpha == NULL && !option_noalpha) {
         fprintf(stderr, "Couldn't find 32bpp visual with alpha.\n");
     }
 
