@@ -343,33 +343,36 @@ static void print_text_graphical(const char *s) {
 }
 
 #define NU_TESTS 20
-#define NU_CORE_TESTS 10
+#define NU_CORE_TESTS 12
 #define NU_TEST_NAMES 22
 #define TEST_SCREENCOPY 0
 #define TEST_ALIGNEDSCREENCOPY 1
-#define TEST_FILLRECT 2
-#define TEST_PUTIMAGE 3
-#define TEST_SHMPUTIMAGE 4
-#define TEST_ALIGNEDSHMPUTIMAGE 5
-#define TEST_SHMPIXMAPTOSCREENCOPY 6
-#define TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY 7
-#define TEST_PIXMAPCOPY 8
-#define TEST_PIXMAPFILLRECT 9
-#define TEST_POINT 10
-#define TEST_LINE 11
-#define TEST_FILLCIRCLE 12
-#define TEST_TEXT8X13 13
-#define TEST_TEXT10X20 14
-#define TEST_XRENDERSHMIMAGE 15
-#define TEST_XRENDERSHMIMAGEALPHA 16
-#define TEST_XRENDERSHMPIXMAP 17
-#define TEST_XRENDERSHMPIXMAPALPHA 18
-#define TEST_XRENDERSHMPIXMAPALPHATOPIXMAP 19
-#define TEST_CORE 20
-#define TEST_ALL 21
+#define TEST_SCREENCOPYDOWNWARDS 2
+#define TEST_SCREENCOPYRIGHTWARDS 3
+#define TEST_FILLRECT 4
+#define TEST_PUTIMAGE 5
+#define TEST_SHMPUTIMAGE 6
+#define TEST_ALIGNEDSHMPUTIMAGE 7
+#define TEST_SHMPIXMAPTOSCREENCOPY 8
+#define TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY 9
+#define TEST_PIXMAPCOPY 10
+#define TEST_PIXMAPFILLRECT 11
+#define TEST_POINT 12
+#define TEST_LINE 13
+#define TEST_FILLCIRCLE 14
+#define TEST_TEXT8X13 15
+#define TEST_TEXT10X20 16
+#define TEST_XRENDERSHMIMAGE 17
+#define TEST_XRENDERSHMIMAGEALPHA 18
+#define TEST_XRENDERSHMPIXMAP 19
+#define TEST_XRENDERSHMPIXMAPALPHA 20
+#define TEST_XRENDERSHMPIXMAPALPHATOPIXMAP 21
+#define TEST_CORE 22
+#define TEST_ALL 23
 
 static const char *test_name[] = {
-    "ScreenCopy", "AlignedScreenCopy", "FillRect", "PutImage", "ShmPutImage",
+    "ScreenCopy", "AlignedScreenCopy", "ScreenCopyDownwards", "ScreenCopyRightwards",
+    "FillRect", "PutImage", "ShmPutImage",
     "AlignedShmPutImage", "ShmPixmapToScreenCopy", "AlignedShmPixmapToScreenCopy",
     "PixmapCopy", "PixmapFillRect", "Point", "Line", "FillCircle", "Text8x13",
     "Text10x20", "XRenderShmImage", "XRenderShmImageAlpha", "XRenderShmPixmap",
@@ -396,6 +399,14 @@ static void test_iteration(int test, int i, int w, int h) {
         break;
     case TEST_ALIGNEDSCREENCOPY:
         XCopyArea(display, window, window, window_gc, i & 7, 1, w, h, i & 7, 0);
+        break;
+    case TEST_SCREENCOPYDOWNWARDS:
+        XCopyArea(display,
+            window, window, window_gc, i & 7, 0, w, h, (i / 8) & 7, 1);
+        break;
+    case TEST_SCREENCOPYRIGHTWARDS:
+        XCopyArea(display,
+            window, window, window_gc, i & 3, 0, w, h, (i & 3) + 1 + ((i & 12) >> 2), 0);
         break;
     case TEST_FILLRECT:
         XFillRectangle(display, window, window_gc, i & 7, ((i / 8) & 7), w, h);
@@ -510,11 +521,23 @@ void do_test(int test, int subtest, int w, int h) {
     switch (test) {
     case TEST_SCREENCOPY:
     case TEST_ALIGNEDSCREENCOPY:
+    case TEST_SCREENCOPYDOWNWARDS:
         nu_iterations = 64;
         if (area < 10000)
             nu_iterations = 1024;
         if (area < 1000)
             nu_iterations = 8192;
+        break;
+    case TEST_SCREENCOPYRIGHTWARDS:
+        nu_iterations = 16;
+        if (area < 100000)
+            nu_iterations = 64;
+        if (area < 10000)
+            nu_iterations = 256;
+        if (area < 1000)
+            nu_iterations = 1024;
+        if (area < 100)
+            nu_iterations = 4096;
         break;
     case TEST_FILLRECT:
     case TEST_PIXMAPFILLRECT:

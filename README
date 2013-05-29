@@ -38,6 +38,10 @@ Options:
 
 	ScreenCopy			Screen to screen blits (using XCopyArea).
 	AlignedScreenCopy		Aligned screen to screen blits (e.g. vertical scrolling).
+	ScreenCopyDownwards		Downwards overlapping screen blit (has to be performed
+					from bottom to top).
+	ScreenCopyRightwards		Rightwards overlapping screen blit (has to be performed
+					from right to left).
 	FillRect			Rectangle fill.
 	PutImage			Slow PutImage using Xlib communication socket.
         ShmPutImage			Fast PutImage using MIT shared memory.
