@@ -91,6 +91,27 @@ With the --window option, the benchmark will run in a window. This is useful for
 with an X server that is already running from within the GUI environment. Results may be less accurate
 that when running with a bare X server.
 
+*** The effects of an enabled shadow framebuffer ***
+
+In a default configuration, when using Xorg's fbdev driver or derivative, the shadow
+framebuffer may be enabled. This implies that all drawing request go into an off-screen
+shadow framebuffer and the actual display is only updated periodically. Running benchx
+with shadow framebuffer enabled will not accurately reflect screen drawing performance,
+although it may be useful in its own right for benchmarking the shadow framebuffer. To
+disable the shadow framebuffer, use the following line in your xorg.conf's Device section:
+
+	Option "ShadowFB" "off"
+
+In Debian, the xorg.conf configuration file to edit or create may be
+/usr/share/X11/xorg.conf.d/99-fbdev.conf or similar. A sample configuration file, using
+fbdev, may look like this:
+
+	Section "Device"
+		Identifier "My device"
+		Driver "fbdev"
+		Option "ShadowFB" "off"
+	EndSection
+
 *** Interpreting results ***
 
 The output includes the number of operations per second, the pixel bandwidth in
