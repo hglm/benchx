@@ -97,6 +97,7 @@ static Window root_window = None;
 static Visual *visual = NULL, *visual_alpha = NULL;
 static unsigned int depth;
 static unsigned int bpp;
+static bool visual_is_BGR = false;
 static int screen_width, screen_height;
 static Window window;
 static GC window_gc = None;
@@ -291,6 +292,15 @@ static void flush_xevent(Display * d) {
         XNextEvent(d, &e);
 //    printf("event %d\n", e.type);
     }
+}
+
+/* Return 32bpp pixel value corresponding to RGB values for the used visual. */
+
+static uint32_t pixel_32bpp_rgba(uint32_t r, uint32_t g, uint32_t b, uint32_t a) {
+    if (!visual_is_BGR)
+        return b | (g << 8) | (r << 16) | (a << 24);
+    else
+        return r | (g << 8) | (b << 16) | (a << 24);
 }
 
 /*
@@ -1128,7 +1138,8 @@ int main(int argc, char *argv[]) {
             }                   /* pict_format_alpha != NULL */
         } /* bpp == 32 */
     } else {
-
+        bool try_BGR = false;
+find_visual:
         /* No feature_render */
         if (bpp == 32) {
             /* try to lookup a RGB visual */
@@ -1136,9 +1147,16 @@ int main(int argc, char *argv[]) {
             xvinfo_template.screen = screen;
             xvinfo_template.depth = 24;
             xvinfo_template.class = TrueColor;
-            xvinfo_template.red_mask = 0xff0000;
-            xvinfo_template.green_mask = 0x00ff00;
-            xvinfo_template.blue_mask = 0x0000ff;
+            if (try_BGR) {
+                xvinfo_template.red_mask = 0x0000ff;
+                xvinfo_template.green_mask = 0x00ff00;
+                xvinfo_template.blue_mask = 0xff0000;
+            }
+            else {
+                xvinfo_template.red_mask = 0xff0000;
+                xvinfo_template.green_mask = 0x00ff00;
+                xvinfo_template.blue_mask = 0x0000ff;
+            }
             xvinfo_template.bits_per_rgb = 8;
 
             xvinfos = XGetVisualInfo(display,
@@ -1162,14 +1180,20 @@ int main(int argc, char *argv[]) {
             for (i = 0; i < count; i++) {
                 if (xvinfos[i].depth == depth) {
                     visual = xvinfos[i].visual;
+                    if (try_BGR)
+                        visual_is_BGR = true;
                     break;
                 }
             }
         }
+        if (bpp == 32 && visual == NULL && !try_BGR) {
+            try_BGR = true;
+            goto find_visual;
+        }
     }
 
     if (visual == NULL) {
-        printf("No suitable visual, fatal, leaving ...\n");
+        printf("Couldn't find a suitable visual.\n");
         return 1;
     }
     if (bpp == 32 && visual_alpha == NULL && !option_noalpha) {
@@ -1585,13 +1609,13 @@ int main(int argc, char *argv[]) {
         if (include_test[i]) {
             /* Blue if it will be run. */
             if (bpp == 32)
-                values.foreground = 0x000000FF;
+                values.foreground = pixel_32bpp_rgba(0, 0, 0xFF, 0);
             else
                 values.foreground = 0x0000001F;
         } else {
             /* Red if it will not be run. */
             if (bpp == 32)
-                values.foreground = 0x00FF0000;
+                values.foreground = pixel_32bpp_rgba(0xFF, 0, 0, 0);
             else
                 values.foreground = 0x0000F800;
         }
@@ -1694,7 +1718,7 @@ int main(int argc, char *argv[]) {
             }
             /* Draw a green dot to indicate the test is finished. */
             if (bpp == 32)
-                values.foreground = 0x00007F00;
+                values.foreground = pixel_32bpp_rgba(0, 0x7F, 0, 0);
             else
                 values.foreground = 0x000003E0;
             XChangeGC(display, window_gc, GCForeground, &values);
