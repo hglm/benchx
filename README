@@ -133,6 +133,6 @@ tests.
 
 Note about PutImage performance:
 
-The tests PutImage, [Aligned]ShmPutImage and [Aligned]PixmapCopy depend highly on CPU caches.
-As the size of the image increases, it may no longer fit into the L2 cache of the CPU, that's
-why bandwidth decreases for the largest sizes.
+The tests PutImage, [Aligned]ShmPutImage, [Aligned]PixmapToScreenCopy and PixmapCopy
+depend highly on CPU caches. As the size of the image increases, it may no longer fit
+into the L2 cache of the CPU, resulting in bandwidth decreases for the largest sizes.
