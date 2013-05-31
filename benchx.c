@@ -1158,10 +1158,12 @@ int main(int argc, char *argv[]) {
                 }
             }                   /* pict_format_alpha != NULL */
         } /* bpp == 32 */
-    } else {
+    }
+
+    if (visual == NULL) {
+        /* No feature_render or found no visual with feature render. */
         bool try_BGR = false;
 find_visual:
-        /* No feature_render */
         if (bpp == 32) {
             /* try to lookup a RGB visual */
             count = 0;
@@ -1214,7 +1216,7 @@ find_visual:
     }
 
     if (visual == NULL) {
-        printf("Couldn't find a suitable visual. Try using the --noxrender option.\n");
+        printf("Couldn't find a suitable visual.\n");
         return 1;
     }
     if (bpp == 32 && visual_alpha == NULL && !option_noalpha) {
