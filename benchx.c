@@ -1624,8 +1624,15 @@ find_visual:
     if (X_pid == -1)
         fprintf(stderr, "Couldn't find pid of X server.\n");
 
-    bool include_test[NU_TESTS];
     XGCValues values;
+    /* Clear the screen if drawing on the root window. */
+    if (!window_mode) {
+        values.foreground = 0;
+        XChangeGC(display, window_gc, GCForeground, &values);
+        XFillRectangle(display, window, window_gc, 0, 0, screen_width, screen_height);
+    }
+
+    bool include_test[NU_TESTS];
     for (int i = 0; i < NU_TESTS; i++) {
         include_test[i] = false;
         if (test == TEST_ALL)
