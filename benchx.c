@@ -733,7 +733,9 @@ void do_test(int test, int subtest, int w, int h) {
         }
         XFlush(display);
         clock_gettime(CLOCK_REALTIME, &current);
-        if (current.tv_sec >= begin.tv_sec + test_duration)
+        if (current.tv_sec > begin.tv_sec + test_duration ||
+        (current.tv_sec == begin.tv_sec + test_duration &&
+        current.tv_nsec >= begin.tv_nsec))
             break;
     }
     /* Make sure no pending request is remaining. */
