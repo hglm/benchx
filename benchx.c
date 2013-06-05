@@ -113,6 +113,7 @@ static GC pixmap1_gc = None, pixmap2_gc = None, pixmap2_alpha_gc = None;
 static XImage *ximage = NULL;
 static XImage *shmximage_ximage = NULL, *shmximage_ximage_alpha;
 static XImage *shmximage_pixmap = NULL, *shmximage_pixmap_alpha = NULL;
+static XImage *shmximage_ximage_full_width[32];
 
 static Pixmap pixmap1 = None;
 static Pixmap pixmap2 = None, pixmap2_alpha = None;
@@ -121,6 +122,7 @@ static Pixmap shmpixmap = None, shmpixmap_alpha = None;
 static uint8_t *data = NULL;
 static uint8_t *shmdata_ximage = NULL, *shmdata_ximage_alpha = NULL;
 static uint8_t *shmdata_pixmap = NULL, *shmdata_pixmap_alpha = NULL;
+static uint8_t *shmdata_ximage_full_width[32];
 
 static Picture pixmap2_pict, pixmap2_alpha_pict;
 static Picture shmpixmap_pict;
@@ -352,8 +354,8 @@ static void print_text_graphical(const char *s) {
     nu_lines++;
 }
 
-#define NU_TESTS 22
-#define NU_CORE_TESTS 12
+#define NU_TESTS 24
+#define NU_CORE_TESTS 14
 #define NU_TEST_NAMES 24
 #define TEST_SCREENCOPY 0
 #define TEST_ALIGNEDSCREENCOPY 1
@@ -362,28 +364,31 @@ static void print_text_graphical(const char *s) {
 #define TEST_FILLRECT 4
 #define TEST_PUTIMAGE 5
 #define TEST_SHMPUTIMAGE 6
-#define TEST_ALIGNEDSHMPUTIMAGE 7
-#define TEST_SHMPIXMAPTOSCREENCOPY 8
-#define TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY 9
-#define TEST_PIXMAPCOPY 10
-#define TEST_PIXMAPFILLRECT 11
-#define TEST_POINT 12
-#define TEST_LINE 13
-#define TEST_FILLCIRCLE 14
-#define TEST_TEXT8X13 15
-#define TEST_TEXT10X20 16
-#define TEST_XRENDERSHMIMAGE 17
-#define TEST_XRENDERSHMIMAGEALPHA 18
-#define TEST_XRENDERSHMPIXMAP 19
-#define TEST_XRENDERSHMPIXMAPALPHA 20
-#define TEST_XRENDERSHMPIXMAPALPHATOPIXMAP 21
-#define TEST_CORE 22
-#define TEST_ALL 23
+#define TEST_SHMPUTIMAGEFULLWIDTH 7
+#define TEST_ALIGNEDSHMPUTIMAGE 8
+#define TEST_ALIGNEDSHMPUTIMAGEFULLWIDTH 9
+#define TEST_SHMPIXMAPTOSCREENCOPY 10
+#define TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY 11
+#define TEST_PIXMAPCOPY 12
+#define TEST_PIXMAPFILLRECT 13
+#define TEST_POINT 14
+#define TEST_LINE 15
+#define TEST_FILLCIRCLE 16
+#define TEST_TEXT8X13 17
+#define TEST_TEXT10X20 18
+#define TEST_XRENDERSHMIMAGE 19
+#define TEST_XRENDERSHMIMAGEALPHA 20
+#define TEST_XRENDERSHMPIXMAP 21
+#define TEST_XRENDERSHMPIXMAPALPHA 22
+#define TEST_XRENDERSHMPIXMAPALPHATOPIXMAP 23
+#define TEST_CORE 24
+#define TEST_ALL 25
 
 static const char *test_name[] = {
     "ScreenCopy", "AlignedScreenCopy", "ScreenCopyDownwards", "ScreenCopyRightwards",
-    "FillRect", "PutImage", "ShmPutImage",
-    "AlignedShmPutImage", "ShmPixmapToScreenCopy", "AlignedShmPixmapToScreenCopy",
+    "FillRect", "PutImage", "ShmPutImage","ShmPutImageFullWidth",
+    "AlignedShmPutImage", "AlignedShmPutImageFullWidth", "ShmPixmapToScreenCopy",
+    "AlignedShmPixmapToScreenCopy",
     "PixmapCopy", "PixmapFillRect", "Point", "Line", "FillCircle", "Text8x13",
     "Text10x20", "XRenderShmImage", "XRenderShmImageAlpha", "XRenderShmPixmap",
     "XRenderShmPixmapAlpha", "XRenderShmPixmapAlphaToPixmap",
@@ -401,7 +406,7 @@ static const char *image_string_text = {
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 };
 
-static void test_iteration(int test, int i, int w, int h) {
+static void test_iteration(int test, int subtest, int i, int w, int h) {
     switch (test) {
     case TEST_SCREENCOPY:
         XCopyArea(display,
@@ -431,11 +436,23 @@ static void test_iteration(int test, int i, int w, int h) {
             window_gc,
             shmximage_ximage, 0, 0, (i & 7), ((i / 8) & 7), w, h, False);
         break;
+    case TEST_SHMPUTIMAGEFULLWIDTH:
+        XShmPutImage(display,
+            window,
+            window_gc,
+            shmximage_ximage_full_width[subtest], 0, 0, (i & 7), ((i / 8) & 7), w, h, False);
+        break;
     case TEST_ALIGNEDSHMPUTIMAGE:
         XShmPutImage(display,
             window,
             window_gc,
             shmximage_ximage, 0, 0, (i & 1) * 8, ((i / 8) & 7), w, h, False);
+        break;
+    case TEST_ALIGNEDSHMPUTIMAGEFULLWIDTH:
+        XShmPutImage(display,
+            window,
+            window_gc,
+            shmximage_ximage_full_width[subtest], 0, 0, (i & 1) * 8, ((i / 8) & 7), w, h, False);
         break;
     case TEST_SHMPIXMAPTOSCREENCOPY:
         XCopyArea(display,
@@ -568,6 +585,8 @@ void do_test(int test, int subtest, int w, int h) {
         break;
     case TEST_SHMPUTIMAGE:
     case TEST_ALIGNEDSHMPUTIMAGE:
+    case TEST_SHMPUTIMAGEFULLWIDTH:
+    case TEST_ALIGNEDSHMPUTIMAGEFULLWIDTH:
     case TEST_SHMPIXMAPTOSCREENCOPY:
     case TEST_ALIGNEDSHMPIXMAPTOSCREENCOPY:
     case TEST_PIXMAPCOPY:
@@ -627,6 +646,15 @@ void do_test(int test, int subtest, int w, int h) {
         unsigned int c = rand();
         for (int i = 0; i < area_width * area_height * (bpp / 8); i++) {
             *((unsigned char *)shmdata_ximage + i) = c & 0xFF;
+            c += 0x7E7E7E7E;
+            if ((i & 255) == 255)
+                c = rand();
+        }
+    }
+    if (test == TEST_SHMPUTIMAGEFULLWIDTH || test == TEST_ALIGNEDSHMPUTIMAGEFULLWIDTH) {
+        unsigned int c = rand();
+        for (int i = 0; i < w * h * (bpp / 8); i++) {
+            *((unsigned char *)shmdata_ximage_full_width[subtest] + i) = c & 0xFF;
             c += 0x7E7E7E7E;
             if ((i & 255) == 255)
                 c = rand();
@@ -705,7 +733,7 @@ void do_test(int test, int subtest, int w, int h) {
 
     /* Warm-up caches etc. */
     for (int i = 0; i < 8; i++)
-        test_iteration(test, i, w, h);
+        test_iteration(test, subtest, i, w, h);
     XSync(display, False);
 
     struct pstat usage_before, usage_after;
@@ -728,7 +756,7 @@ void do_test(int test, int subtest, int w, int h) {
     for (;;) {
         struct timespec current;
         for (int i = 0; i < nu_iterations; i++) {
-            test_iteration(test, i, w, h);
+            test_iteration(test, subtest, i, w, h);
             operation_count++;
         }
         XFlush(display);
@@ -782,8 +810,9 @@ void do_test(int test, int subtest, int w, int h) {
 }
 
 int check_test_available(int test) {
-    if ((test == TEST_SHMPUTIMAGE || test == TEST_ALIGNEDSHMPUTIMAGE)
-        && !feature_shm) {
+    if ((test == TEST_SHMPUTIMAGE || test == TEST_ALIGNEDSHMPUTIMAGE
+    || test == TEST_SHMPUTIMAGEFULLWIDTH || test == TEST_ALIGNEDSHMPUTIMAGEFULLWIDTH)
+    && !feature_shm) {
         printf("Cannot run test %s because SHM is not supported.\n",
             test_name[test]);
         return 0;
@@ -848,7 +877,7 @@ int main(int argc, char *argv[]) {
 
     XRenderPictureAttributes pict_attr;
 
-    XShmSegmentInfo shminfo_ximage, shminfo_ximage_alpha;
+    XShmSegmentInfo shminfo_ximage, shminfo_ximage_alpha, shminfo_ximage_full_width[32];
     XShmSegmentInfo shminfo_pixmap, shminfo_pixmap_alpha;
 
     int major;
@@ -1347,15 +1376,65 @@ find_visual:
 
             shmctl(shminfo_ximage_alpha.shmid, IPC_RMID, 0);
 
-        if (shminfo_ximage_alpha.shmaddr == (void *)-1 ||
-            shminfo_ximage_alpha.shmaddr == NULL) {
-            perror("shmat()");
-            return 1;
+            if (shminfo_ximage_alpha.shmaddr == (void *)-1 ||
+                shminfo_ximage_alpha.shmaddr == NULL) {
+                perror("shmat()");
+                return 1;
+            }
+
+            shmdata_ximage_alpha = shmximage_ximage_alpha->data;
+
+            XShmAttach(display, &shminfo_ximage_alpha);
         }
 
-        shmdata_ximage_alpha = shmximage_ximage_alpha->data;
+        /* Create individual SHM images for the ShmPutImageFullWidth tests. */
+        int max_size = area_width;
+        if (max_size > area_height)
+            max_size = area_height;
+        int subtest = 0;
+        for (int size = 5; size + 8 <= max_size; size = size * 3 / 2) {
+            if (subtest == 32) {
+                printf("Subtest number of images overflow.\n");
+                return 1;
+            }
+            shminfo_ximage_full_width[subtest].shmid = -1;
+            shminfo_ximage_full_width[subtest].shmaddr = (char *)-1;
+            shminfo_ximage_full_width[subtest].readOnly = False;
 
-        XShmAttach(display, &shminfo_ximage_alpha);
+            shmximage_ximage_full_width[subtest] = XShmCreateImage(display,
+                visual,
+                depth, ZPixmap, NULL, &shminfo_ximage_full_width[subtest], size, size);
+
+            if (shmximage_ximage_full_width[subtest] == NULL) {
+                fprintf(stderr, "Can't create XImage for SHM\n");
+                return 1;
+            }
+
+            shminfo_ximage_full_width[subtest].shmid =
+                shmget(IPC_PRIVATE,
+                shmximage_ximage_full_width[subtest]->bytes_per_line * shmximage_ximage_full_width[subtest]->height,
+                IPC_CREAT | 0600);
+
+            if (shminfo_ximage_full_width[subtest].shmid == -1) {
+                perror("shmget()");
+                return 1;
+            }
+
+            shminfo_ximage_full_width[subtest].shmaddr = shmximage_ximage_full_width[subtest]->data =
+                shmat(shminfo_ximage_full_width[subtest].shmid, NULL, 0);
+
+            shmctl(shminfo_ximage_full_width[subtest].shmid, IPC_RMID, 0);
+
+            if (shminfo_ximage_full_width[subtest].shmaddr == (void *)-1 ||
+                shminfo_ximage_full_width[subtest].shmaddr == NULL) {
+                perror("shmat()");
+                return 1;
+            }
+
+            shmdata_ximage_full_width[subtest] = shmximage_ximage_full_width[subtest]->data;
+
+            XShmAttach(display, &shminfo_ximage_full_width[subtest]);
+            subtest++;
         }
     }
 

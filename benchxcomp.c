@@ -37,15 +37,16 @@ typedef struct {
     int cpu[MAX_RESULTS];
 } BenchResults;
 
-#define NU_TEST_TYPES 22
+#define NU_TEST_TYPES 24
 
 static const char *test_name[NU_TEST_TYPES] = {
     "ScreenCopy", "AlignedScreenCopy", "ScreenCopyDownwards", "ScreenCopyRightwards",
-    "FillRect", "PutImage", "ShmPutImage", "AlignedShmPutImage",
-    "ShmPixmapToScreenCopy", "AlignedShmPixmapToScreenCopy", "PixmapCopy", "PixmapFillRect",
-    "Point", "Line", "FillCircle", "Text8x13", "Text10x20", "XRenderShmImage",
-    "XRenderShmImageAlpha", "XRenderShmPixmap",
-    "XRenderShmPixmapAlpha", "XRenderShmPixmapAlphaToPixmap"
+    "FillRect", "PutImage", "ShmPutImage","ShmPutImageFullWidth",
+    "AlignedShmPutImage", "AlignedShmPutImageFullWidth", "ShmPixmapToScreenCopy",
+    "AlignedShmPixmapToScreenCopy",
+    "PixmapCopy", "PixmapFillRect", "Point", "Line", "FillCircle", "Text8x13",
+    "Text10x20", "XRenderShmImage", "XRenderShmImageAlpha", "XRenderShmPixmap",
+    "XRenderShmPixmapAlpha", "XRenderShmPixmapAlphaToPixmap",
 };
 
 static int lookup_test_name(const char *name) {
