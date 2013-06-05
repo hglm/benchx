@@ -100,10 +100,10 @@ static void usage() {
 static void process_file(FILE *f, BenchResults *b) {
     bench_results_initialize(b);
     for (;;) {
-        if (feof(f))
-            break;
         char s[256];
         fgets(s, 256, f);
+        if (feof(f))
+            break;
         char name[256];
         int width, height;
         double ops_sec, bandwidth;
