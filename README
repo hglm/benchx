@@ -51,7 +51,11 @@ Options:
 	FillRect			Rectangle fill.
 	PutImage			Slow PutImage using Xlib communication socket.
         ShmPutImage			Fast PutImage using MIT shared memory.
+        ShmPutImageFullWidth            Instead of copying only part of the width of the source image,
+                                        copy the full width. This triggers an unoptimized code path
+                                        in the Xorg fbdev driver.
         AlignedShmPutImage		Same but destination x-coordinate is aligned to multiple of 8.
+        AlignedShmPutImageFullWidth     Copies the full with of the image.
         ShmPixmapToScreenCopy		CopyArea from shared memory pixmap to screen.
         AlignedShmPixmapToScreenCopy	Same but destination position is aligned to multiple of 8.
 	PixmapCopy			Copy pixmap to another pixmap (server-side).
