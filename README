@@ -84,15 +84,17 @@ Running as root is helpful for accuracy but not strictly necessary.
 
 It is best run on a bare X server without a window manager, because otherwise the window manager
 may interfere with the results. To do so, create or edit the file .xinitrc in your home directory
-so that has the two lines:
+so that it has the following lines:
 
 	xset s off
+        xset -dpms
+        xset s noblank
 	benchx <testname> > benchx.out
 
-The first line disables the X screensaver. You may need other measures to disable screen saving/blanking
-after a certain period. If you start the X server using startx, it will automatically run the
-specified test, and the X server should exit after it is finished. A sample xinitrc file that
-runs all the tests is provided.
+The first three lines disable the X screensaver. This will probably only work as root. You may
+need other measures to disable screen saving/blanking after a certain period. If you start the
+X server using startx, it will automatically run the specified test, and the X server should
+exit after it is finished. A sample xinitrc file that runs all the tests is provided.
 
 *** Running in a window ***
 
