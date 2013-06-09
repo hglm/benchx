@@ -354,9 +354,9 @@ static void print_text_graphical(const char *s) {
     nu_lines++;
 }
 
-#define NU_TESTS 26
+#define NU_TESTS 24
 #define NU_CORE_TESTS 14
-#define NU_TEST_NAMES 24
+#define NU_TEST_NAMES 26
 #define TEST_SCREENCOPY 0
 #define TEST_ALIGNEDSCREENCOPY 1
 #define TEST_SCREENCOPYDOWNWARDS 2
